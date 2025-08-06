@@ -39,6 +39,42 @@
 
 **按分钟付费，而不是按月！**
 
+## 📋 前提条件
+
+开始之前，请确保您已准备好：
+
+### 1. AWS 账户及必需权限
+- **AWS Access Key ID** 和 **AWS Secret Access Key**
+- IAM 权限包括：
+  - EC2（创建、终止、查询实例）
+  - VPC（安全组、子网）
+  - EC2 Pricing API 访问权限
+
+### 2. AWS 资源
+- **EC2 密钥对** - 用于 SSH 访问实例
+- **安全组** - 开放 5000 端口供 API 访问
+- **VPC 子网 ID** - 实例将在此子网启动
+
+### 3. 本地环境要求
+- Python 3.7+
+- pip（Python 包管理器）
+- 互联网连接（用于 AWS API 调用）
+
+### 4. AWS 凭证配置
+使用以下任一方法配置 AWS 凭证：
+```bash
+# 方法 1：AWS CLI
+aws configure
+
+# 方法 2：环境变量
+export AWS_ACCESS_KEY_ID=your-access-key
+export AWS_SECRET_ACCESS_KEY=your-secret-key
+export AWS_DEFAULT_REGION=us-east-1
+
+# 方法 3：AWS 凭证文件
+~/.aws/credentials
+```
+
 ## 🚀 快速开始
 
 ### 1. 安装

@@ -39,13 +39,49 @@ Running cloud instances 24/7 is expensive. This framework:
 
 **You pay by the minute, not by the month!**
 
+## 📋 Prerequisites
+
+Before you start, make sure you have:
+
+### 1. AWS Account with Required Permissions
+- **AWS Access Key ID** and **AWS Secret Access Key**
+- IAM permissions for:
+  - EC2 (create, terminate, describe instances)
+  - VPC (security groups, subnets)
+  - EC2 Pricing API access
+
+### 2. AWS Resources
+- **EC2 Key Pair** - for SSH access to instances
+- **Security Group** - with port 5000 open for API access
+- **VPC Subnet ID** - where instances will be launched
+
+### 3. Local Requirements
+- Python 3.7+
+- pip (Python package manager)
+- Internet connection for AWS API calls
+
+### 4. AWS Credentials Configuration
+Configure AWS credentials using one of these methods:
+```bash
+# Method 1: AWS CLI
+aws configure
+
+# Method 2: Environment variables
+export AWS_ACCESS_KEY_ID=your-access-key
+export AWS_SECRET_ACCESS_KEY=your-secret-key
+export AWS_DEFAULT_REGION=us-east-1
+
+# Method 3: AWS credentials file
+~/.aws/credentials
+```
+
 ## 🚀 Quick Start
 
 ### 1. Install
 
 ```bash
-git clone https://github.com/your-username/instant-instance-operation
-cd instant-instance-operation
+git clone https://github.com/preangelleo/cloudburst
+cd cloudburst
 pip install -r requirements.txt
 ```
 
