@@ -22,11 +22,11 @@ A Python framework that **automatically manages AWS EC2 instances** for on-deman
 This project builds on my first open source project: [**Video Generation API**](https://github.com/betashow/video-generation-docker)
 
 - **Video Generation API**: Run a persistent Docker container for video generation (pay monthly)
-- **This Project**: Create instances on-demand for video generation (pay per minute)
+- **This Project**: Create on demand, ready when needed; shut down after use, pay by the second
 
 Choose based on your needs:
 - Frequent usage → Use Video Generation API (persistent container)
-- Occasional usage → Use this framework (on-demand instances)
+- Occasional usage → Use this framework (create on demand, ready when needed; shut down after use, pay by the second)
 
 ## 🎯 The Problem It Solves
 
