@@ -130,18 +130,18 @@ print(f"⏱️  总时间：{result['total_time']:.1f} 秒")
 self.instance_configs = [
     {
         "priority": 1,
-        "instance_type": "g4dn.xlarge",  # GPU 用于 ML/视频
-        "description": "NVIDIA T4 GPU"
+        "instance_type": "c5.2xlarge",   # CPU 优化型
+        "description": "计算优化 - 8 vCPU, 16GB RAM"
     },
     {
         "priority": 2, 
-        "instance_type": "c5.2xlarge",   # 高 CPU
-        "description": "计算优化"
+        "instance_type": "m5.xlarge",    # 内存优化型
+        "description": "内存优化 - 4 vCPU, 16GB RAM"
     },
     {
         "priority": 3,
-        "instance_type": "t3.xlarge",    # 平衡型
-        "description": "通用型"
+        "instance_type": "g4dn.xlarge",  # GPU 用于 ML/视频
+        "description": "NVIDIA T4 - 4 vCPU, 16GB RAM, 16GB GPU"
     }
 ]
 ```

@@ -33,11 +33,11 @@ class InstantInstanceOperationV2:
         aws_region = os.getenv('AWS_REGION', 'us-east-1')
         self.ec2_client = boto3.client('ec2', region_name=aws_region)
         
-        # 🆕 Instance Configuration Priority List (1-3) - QUOTA-FRIENDLY VERSION
+        # Instance Configuration Priority List (1-3)
         self.instance_configs = [
             {
                 "priority": 1,
-                "instance_type": "c5.2xlarge",  # 🔧 Changed from 8xlarge to 2xlarge (quota-friendly)
+                "instance_type": "c5.2xlarge",
                 "name": "CPU_HIGH_PERFORMANCE",
                 "description": "Compute optimized - 8 vCPU, 16GB RAM (quota-friendly)",
                 "category": "CPU-Optimized",
@@ -47,7 +47,7 @@ class InstantInstanceOperationV2:
             },
             {
                 "priority": 2,
-                "instance_type": "m5.xlarge",  # 🔧 Changed from 4xlarge to xlarge (quota-friendly) 
+                "instance_type": "m5.xlarge", 
                 "name": "MEMORY_OPTIMIZED", 
                 "description": "Memory optimized - 4 vCPU, 16GB RAM (quota-friendly)",
                 "category": "Memory-Optimized",
@@ -57,7 +57,7 @@ class InstantInstanceOperationV2:
             },
             {
                 "priority": 3,
-                "instance_type": "g4dn.xlarge",  # 🔧 Changed from 4xlarge to xlarge (quota-friendly)
+                "instance_type": "g4dn.xlarge",
                 "name": "GPU_NVIDIA_T4",
                 "description": "NVIDIA T4 - 4 vCPU, 16GB RAM, 16GB GPU (quota-friendly)",
                 "category": "GPU-Optimized",

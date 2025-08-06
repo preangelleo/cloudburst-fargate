@@ -160,18 +160,18 @@ print(f"⏱️  Total time: {result['total_time']:.1f} seconds")
 self.instance_configs = [
     {
         "priority": 1,
-        "instance_type": "g4dn.xlarge",  # GPU for ML/video
-        "description": "NVIDIA T4 GPU"
+        "instance_type": "c5.2xlarge",   # CPU optimized
+        "description": "Compute optimized - 8 vCPU, 16GB RAM"
     },
     {
         "priority": 2, 
-        "instance_type": "c5.2xlarge",   # High CPU
-        "description": "Compute optimized"
+        "instance_type": "m5.xlarge",    # Memory optimized
+        "description": "Memory optimized - 4 vCPU, 16GB RAM"
     },
     {
         "priority": 3,
-        "instance_type": "t3.xlarge",    # Balanced
-        "description": "General purpose"
+        "instance_type": "g4dn.xlarge",  # GPU for ML/video
+        "description": "NVIDIA T4 - 4 vCPU, 16GB RAM, 16GB GPU"
     }
 ]
 ```
