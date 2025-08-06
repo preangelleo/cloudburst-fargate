@@ -50,30 +50,38 @@
   - VPC（安全组、子网）
   - EC2 Pricing API 访问权限
 
-### 2. AWS 资源
-- **EC2 密钥对** - 用于 SSH 访问实例
-- **安全组** - 开放 5000 端口供 API 访问
-- **VPC 子网 ID** - 实例将在此子网启动
+### 2. AWS 资源（必须先在 AWS 控制台创建）
+- **EC2 密钥对** - 用于 SSH 访问实例（在 EC2 → 密钥对 中创建）
+- **安全组** - 开放 5000 端口供 API 访问（在 EC2 → 安全组 中创建）
+- **VPC 子网 ID** - 实例将在此子网启动（在 VPC → 子网 中查找）
 
 ### 3. 本地环境要求
 - Python 3.7+
 - pip（Python 包管理器）
 - 互联网连接（用于 AWS API 调用）
 
-### 4. AWS 凭证配置
-使用以下任一方法配置 AWS 凭证：
-```bash
-# 方法 1：AWS CLI
-aws configure
+### 4. AWS 凭证设置
 
-# 方法 2：环境变量
+本框架使用 boto3，它会自动按以下顺序查找 AWS 凭证：
+
+1. **环境变量**（推荐用于生产环境）
+```bash
 export AWS_ACCESS_KEY_ID=your-access-key
 export AWS_SECRET_ACCESS_KEY=your-secret-key
 export AWS_DEFAULT_REGION=us-east-1
+```
 
-# 方法 3：AWS 凭证文件
+2. **AWS CLI 配置**（如果您已安装 AWS CLI）
+```bash
+aws configure
+```
+
+3. **AWS 凭证文件**（由 AWS CLI 自动创建）
+```
 ~/.aws/credentials
 ```
+
+**注意**：您无需手动创建任何文件。只需设置环境变量或使用 AWS CLI 即可。
 
 ## 🚀 快速开始
 

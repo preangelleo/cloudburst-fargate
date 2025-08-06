@@ -50,30 +50,38 @@ Before you start, make sure you have:
   - VPC (security groups, subnets)
   - EC2 Pricing API access
 
-### 2. AWS Resources
-- **EC2 Key Pair** - for SSH access to instances
-- **Security Group** - with port 5000 open for API access
-- **VPC Subnet ID** - where instances will be launched
+### 2. AWS Resources (Must Create in AWS Console First)
+- **EC2 Key Pair** - for SSH access to instances (create in EC2 → Key Pairs)
+- **Security Group** - with port 5000 open for API access (create in EC2 → Security Groups)
+- **VPC Subnet ID** - where instances will be launched (find in VPC → Subnets)
 
 ### 3. Local Requirements
 - Python 3.7+
 - pip (Python package manager)
 - Internet connection for AWS API calls
 
-### 4. AWS Credentials Configuration
-Configure AWS credentials using one of these methods:
-```bash
-# Method 1: AWS CLI
-aws configure
+### 4. AWS Credentials Setup
 
-# Method 2: Environment variables
+The framework uses boto3, which automatically finds AWS credentials in this order:
+
+1. **Environment variables** (recommended for production)
+```bash
 export AWS_ACCESS_KEY_ID=your-access-key
 export AWS_SECRET_ACCESS_KEY=your-secret-key
 export AWS_DEFAULT_REGION=us-east-1
+```
 
-# Method 3: AWS credentials file
+2. **AWS CLI configuration** (if you have AWS CLI installed)
+```bash
+aws configure
+```
+
+3. **AWS credentials file** (automatically created by AWS CLI)
+```
 ~/.aws/credentials
 ```
+
+**Note**: You don't need to create any files manually. Just set the environment variables or use AWS CLI.
 
 ## 🚀 Quick Start
 
