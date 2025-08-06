@@ -229,20 +229,42 @@ self.instance_configs = [
     {
         "priority": 1,
         "instance_type": "c5.2xlarge",   # CPU 优化型
-        "description": "计算优化 - 8 vCPU, 16GB RAM"
+        "description": "计算优化 - 8 vCPU, 16GB RAM",
+        "hourly_cost": "$0.475/小时"     # ~$0.008/分钟
     },
     {
         "priority": 2, 
         "instance_type": "m5.xlarge",    # 内存优化型
-        "description": "内存优化 - 4 vCPU, 16GB RAM"
+        "description": "内存优化 - 4 vCPU, 16GB RAM",
+        "hourly_cost": "$0.192/小时"     # ~$0.003/分钟
     },
     {
         "priority": 3,
         "instance_type": "g4dn.xlarge",  # GPU 用于 ML/视频
-        "description": "NVIDIA T4 - 4 vCPU, 16GB RAM, 16GB GPU"
+        "description": "NVIDIA T4 - 4 vCPU, 16GB RAM, 16GB GPU",
+        "hourly_cost": "$0.526/小时"     # ~$0.009/分钟
     }
 ]
 ```
+
+### 💰 AWS 实例价格参考
+*最后更新：2025年8月6日 20:23 UTC | 区域：us-east-1（北弗吉尼亚）| Linux 按需实例*
+
+| 实例类型 | vCPU | 内存 | GPU | 类别 | 每小时费用 | 每分钟 | 25分钟任务 |
+|---------|------|------|-----|------|-----------|--------|-----------|
+| **c5.2xlarge** ⭐ | 8 | 16GB | - | CPU 优化 | $0.475 | $0.0079 | $0.20 |
+| **m5.xlarge** | 4 | 16GB | - | 内存优化 | $0.192 | $0.0032 | $0.08 |
+| **g4dn.xlarge** | 4 | 16GB | T4 16GB | GPU 实例 | $0.526 | $0.0088 | $0.22 |
+| t3.xlarge | 4 | 16GB | - | 通用型 | $0.234 | $0.0039 | $0.10 |
+| t3.large | 2 | 8GB | - | 通用型 | $0.083 | $0.0014 | $0.03 |
+| c5.xlarge | 4 | 8GB | - | CPU 优化 | $0.170 | $0.0028 | $0.07 |
+| m5.large | 2 | 8GB | - | 内存优化 | $0.164 | $0.0027 | $0.07 |
+| c5.4xlarge | 16 | 32GB | - | CPU 优化 | $6.680 | $0.1113 | $2.78 |
+| g4dn.2xlarge | 8 | 32GB | T4 16GB | GPU 实例 | $0.752 | $0.0125 | $0.31 |
+
+⭐ = 默认/推荐实例类型
+
+**注意**：价格为 Linux 按需实例价格。竞价实例可便宜 50-90%。价格可能因区域而异。
 
 
 ## 📋 系统要求
