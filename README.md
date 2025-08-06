@@ -17,16 +17,21 @@ A Python framework that **automatically manages AWS EC2 instances** for on-deman
 
 **Perfect for**: Production applications that need to generate videos as part of their workflow but don't want to maintain 24/7 GPU instances.
 
-## 🔗 Related Project
+## 🔗 Built on Video Generation API
 
-This project builds on my first open source project: [**Video Generation API**](https://github.com/preangelleo/video-generation-docker)
+This project leverages my first open source project: [**Video Generation API**](https://github.com/preangelleo/video-generation-docker)
 
-- **Video Generation API**: Run a persistent Docker container for video generation (pay monthly)
-- **This Project**: Create on demand, ready when needed; shut down after use, pay by the second
+### The Perfect Combination:
+- **[Video Generation API](https://github.com/preangelleo/video-generation-docker)**: The core Docker image that actually generates the videos
+- **CloudBurst (This Project)**: Automates AWS deployment to run the API on-demand
 
-Choose based on your needs:
-- Frequent usage → Use Video Generation API (persistent container)
-- Occasional usage → Use this framework (create on demand, ready when needed; shut down after use, pay by the second)
+### Two Deployment Options:
+| Option | Best For | Cost Model | Setup |
+|--------|----------|------------|-------|
+| **Video Generation API** | Frequent usage, always-on service | Pay monthly (~$500) | Run Docker container 24/7 |
+| **CloudBurst** | Occasional usage, batch processing | Pay per use (~$0.20/batch) | Auto create/destroy instances |
+
+CloudBurst automatically pulls and deploys the Video Generation API Docker image, giving you the same powerful video generation capabilities with 96% cost savings!
 
 ## 🎯 The Problem It Solves
 
