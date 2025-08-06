@@ -101,6 +101,25 @@ print(f"Total cost: ${total_cost:.4f}")
 
 ## 📊 Real Example - Video Generation
 
+### Required Folder Structure
+```
+video_scenes/
+├── images/
+│   ├── scene_001_chinese.png
+│   ├── scene_002_chinese.png
+│   └── scene_003_chinese.png
+├── audio/
+│   ├── scene_001_chinese.mp3
+│   ├── scene_002_chinese.mp3
+│   ├── scene_003_chinese.mp3
+│   ├── scene_001_chinese.srt (optional)
+│   ├── scene_002_chinese.srt (optional)
+│   └── scene_003_chinese.srt (optional)
+```
+
+**Note**: Files must follow the naming pattern `scene_XXX_chinese.*` for Chinese or `scene_XXX_english.*` for English.
+
+### Code Example
 ```python
 # Example: Generate 15 videos with effects
 from instant_instance_operation_v2 import scan_and_test_folder

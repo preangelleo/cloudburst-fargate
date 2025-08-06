@@ -66,6 +66,25 @@ DOCKER_IMAGE=betashow/video-generation-api:latest
 
 ### 3. 使用示例
 
+#### 所需文件夹结构
+```
+video_scenes/
+├── images/
+│   ├── scene_001_chinese.png
+│   ├── scene_002_chinese.png
+│   └── scene_003_chinese.png
+├── audio/
+│   ├── scene_001_chinese.mp3
+│   ├── scene_002_chinese.mp3
+│   ├── scene_003_chinese.mp3
+│   ├── scene_001_chinese.srt (可选)
+│   ├── scene_002_chinese.srt (可选)
+│   └── scene_003_chinese.srt (可选)
+```
+
+**注意**：文件必须遵循命名模式 `scene_XXX_chinese.*`（中文）或 `scene_XXX_english.*`（英文）
+
+#### 代码示例
 ```python
 from instant_instance_operation_v2 import scan_and_test_folder
 
@@ -147,18 +166,30 @@ self.instance_configs = [
 ```
 
 ### 文件夹结构要求
+
+对于自动扫描功能，文件必须遵循特定命名模式：
+
 ```
 你的场景文件夹/
 ├── images/
-│   ├── scene_001.png
-│   ├── scene_002.png
+│   ├── scene_001_chinese.png
+│   ├── scene_002_chinese.png
+│   └── scene_003_chinese.png
 ├── audio/
-│   ├── scene_001.mp3
-│   ├── scene_002.mp3
-└── subtitle/ (可选)
-    ├── scene_001.srt
-    ├── scene_002.srt
+│   ├── scene_001_chinese.mp3
+│   ├── scene_002_chinese.mp3
+│   ├── scene_003_chinese.mp3
+│   ├── scene_001_chinese.srt (可选)
+│   ├── scene_002_chinese.srt (可选)
+│   └── scene_003_chinese.srt (可选)
 ```
+
+**命名规则**：
+- 中文：`scene_XXX_chinese.*`
+- 英文：`scene_XXX_english.*`
+- XXX 为三位数字（如 001, 002）
+
+如果您的文件命名不同，请使用自定义场景列表方式（见 example_usage.py）。
 
 ## 📋 系统要求
 
