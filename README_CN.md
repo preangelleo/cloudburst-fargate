@@ -110,29 +110,26 @@ DOCKER_IMAGE=betashow/video-generation-api:latest
 
 ### 3. 使用示例
 
-#### 所需文件夹结构
+#### 方法 1：自动文件夹扫描
+
+**所需文件夹结构**：
 ```
 video_scenes/
 ├── images/
 │   ├── scene_001_chinese.png
-│   ├── scene_002_chinese.png
-│   └── scene_003_chinese.png
+│   └── scene_002_chinese.png
 ├── audio/
 │   ├── scene_001_chinese.mp3
 │   ├── scene_002_chinese.mp3
-│   ├── scene_003_chinese.mp3
 │   ├── scene_001_chinese.srt (可选)
-│   ├── scene_002_chinese.srt (可选)
-│   └── scene_003_chinese.srt (可选)
+│   └── scene_002_chinese.srt (可选)
 ```
 
-**注意**：文件必须遵循命名模式 `scene_XXX_chinese.*`（中文）或 `scene_XXX_english.*`（英文）
+**注意**：文件必须遵循命名模式 `scene_XXX_chinese.*` 或 `scene_XXX_english.*`
 
-#### 代码示例
 ```python
 from instant_instance_operation_v2 import scan_and_test_folder
 
-# 处理整个文件夹的视频
 result = scan_and_test_folder(
     folder_path="./video_scenes/",
     language="chinese",
@@ -141,7 +138,45 @@ result = scan_and_test_folder(
 
 print(f"✅ 生成了 {result['successful_scenes']} 个视频")
 print(f"💰 总成本：${result['cost_usd']:.4f}")
-print(f"⏱️  总时间：{result['total_time']:.1f} 秒")
+```
+
+#### 方法 2：自定义场景列表（更灵活）
+
+```python
+from instant_instance_operation_v2 import InstantInstanceOperationV2
+
+# 初始化
+operation = InstantInstanceOperationV2()
+
+# 定义场景（可使用任意文件路径）
+scenes = [
+    {
+        "scene_name": "intro_video",
+        "input_image": "/path/to/intro.png",
+        "input_audio": "/path/to/intro.mp3",
+        "subtitle": "/path/to/intro.srt"  # 可选，可为 None
+    },
+    {
+        "scene_name": "main_content",
+        "input_image": "/path/to/main.png", 
+        "input_audio": "/path/to/main.mp3",
+        "subtitle": None  # 此场景无字幕
+    }
+]
+
+# 处理场景
+result = operation.execute_batch_test(
+    scenes=scenes,
+    language="chinese",
+    enable_zoom=True
+)
+
+print(f"✅ 处理了 {result['successful_scenes']} 个视频")
+print(f"💰 总成本：${result['cost_usd']:.4f}")
+
+# 输出示例：
+# ✅ 处理了 2 个视频
+# 💰 总成本：$0.0187
 ```
 
 ## 📊 真实案例
@@ -209,31 +244,6 @@ self.instance_configs = [
 ]
 ```
 
-### 文件夹结构要求
-
-对于自动扫描功能，文件必须遵循特定命名模式：
-
-```
-你的场景文件夹/
-├── images/
-│   ├── scene_001_chinese.png
-│   ├── scene_002_chinese.png
-│   └── scene_003_chinese.png
-├── audio/
-│   ├── scene_001_chinese.mp3
-│   ├── scene_002_chinese.mp3
-│   ├── scene_003_chinese.mp3
-│   ├── scene_001_chinese.srt (可选)
-│   ├── scene_002_chinese.srt (可选)
-│   └── scene_003_chinese.srt (可选)
-```
-
-**命名规则**：
-- 中文：`scene_XXX_chinese.*`
-- 英文：`scene_XXX_english.*`
-- XXX 为三位数字（如 001, 002）
-
-如果您的文件命名不同，请使用自定义场景列表方式（见 example_usage.py）。
 
 ## 📋 系统要求
 

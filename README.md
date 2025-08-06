@@ -145,27 +145,24 @@ print(f"Total cost: ${total_cost:.4f}")
 
 ## 📊 Real Example - Video Generation
 
-### Required Folder Structure
+### Method 1: Automatic Folder Scanning
+
+**Required folder structure**:
 ```
 video_scenes/
 ├── images/
 │   ├── scene_001_chinese.png
-│   ├── scene_002_chinese.png
-│   └── scene_003_chinese.png
+│   └── scene_002_chinese.png
 ├── audio/
 │   ├── scene_001_chinese.mp3
 │   ├── scene_002_chinese.mp3
-│   ├── scene_003_chinese.mp3
 │   ├── scene_001_chinese.srt (optional)
-│   ├── scene_002_chinese.srt (optional)
-│   └── scene_003_chinese.srt (optional)
+│   └── scene_002_chinese.srt (optional)
 ```
 
-**Note**: Files must follow the naming pattern `scene_XXX_chinese.*` for Chinese or `scene_XXX_english.*` for English.
+**Note**: Files must follow naming pattern `scene_XXX_chinese.*` or `scene_XXX_english.*`
 
-### Code Example
 ```python
-# Example: Generate 15 videos with effects
 from instant_instance_operation_v2 import scan_and_test_folder
 
 result = scan_and_test_folder(
@@ -174,15 +171,47 @@ result = scan_and_test_folder(
     enable_zoom=True
 )
 
-# Results you get:
 print(f"✅ Generated {result['successful_scenes']} videos")
 print(f"💰 Total cost: ${result['cost_usd']:.4f}")
-print(f"⏱️  Total time: {result['total_time']:.1f} seconds")
+```
 
-# Output:
-# ✅ Generated 15 videos
+### Method 2: Custom Scene List (More Flexible)
+
+```python
+from instant_instance_operation_v2 import InstantInstanceOperationV2
+
+# Initialize
+operation = InstantInstanceOperationV2()
+
+# Define your scenes with any file paths
+scenes = [
+    {
+        "scene_name": "intro_video",
+        "input_image": "/path/to/intro.png",
+        "input_audio": "/path/to/intro.mp3",
+        "subtitle": "/path/to/intro.srt"  # Optional, can be None
+    },
+    {
+        "scene_name": "main_content",
+        "input_image": "/path/to/main.png", 
+        "input_audio": "/path/to/main.mp3",
+        "subtitle": None  # No subtitle for this scene
+    }
+]
+
+# Process scenes
+result = operation.execute_batch_test(
+    scenes=scenes,
+    language="english",
+    enable_zoom=True
+)
+
+print(f"✅ Processed {result['successful_scenes']} videos")
+print(f"💰 Total cost: ${result['cost_usd']:.4f}")
+
+# Output example:
+# ✅ Processed 2 videos
 # 💰 Total cost: $0.0187
-# ⏱️  Total time: 385.2 seconds
 ```
 
 ## 💡 Key Features
