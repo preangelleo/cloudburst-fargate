@@ -175,6 +175,20 @@ print(f"✅ Generated {result['successful_scenes']} videos")
 print(f"💰 Total cost: ${result['cost_usd']:.4f}")
 ```
 
+### 🎬 Output Example
+
+Here's what you can expect from the generated videos:
+
+[![Video Generation Example](https://img.youtube.com/vi/WYFyUAk9F6k/maxresdefault.jpg)](https://www.youtube.com/watch?v=WYFyUAk9F6k)
+
+**Video Features Demonstrated**:
+- ✅ Professional Chinese subtitles with background
+- ✅ Smooth zoom effects (Ken Burns effect)
+- ✅ Synchronized audio and visuals
+- ✅ High-quality video output (1080p)
+
+This example shows the "Full Featured" mode with both subtitles and effects enabled.
+
 ### Method 2: Custom Scene List (More Flexible)
 
 ```python

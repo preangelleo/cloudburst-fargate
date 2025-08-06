@@ -140,6 +140,20 @@ print(f"✅ 生成了 {result['successful_scenes']} 个视频")
 print(f"💰 总成本：${result['cost_usd']:.4f}")
 ```
 
+### 🎬 输出效果示例
+
+以下是生成视频的实际效果：
+
+[![视频生成示例](https://img.youtube.com/vi/WYFyUAk9F6k/maxresdefault.jpg)](https://www.youtube.com/watch?v=WYFyUAk9F6k)
+
+**视频特性展示**：
+- ✅ 专业中文字幕（带背景框）
+- ✅ 流畅的缩放特效（Ken Burns 效果）
+- ✅ 音画同步
+- ✅ 高质量视频输出（1080p）
+
+此示例展示了"完整功能"模式，同时启用了字幕和特效。
+
 #### 方法 2：自定义场景列表（更灵活）
 
 ```python
