@@ -1,0 +1,12 @@
+# Instant Instance Operation - Python Dependencies
+# AWS SDK
+boto3>=1.26.0
+
+# HTTP requests
+requests>=2.28.0
+
+# Environment configuration
+python-dotenv>=0.19.0
+
+# Optional: Better CLI formatting
+colorama>=0.4.4
