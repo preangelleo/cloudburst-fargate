@@ -60,7 +60,7 @@ AWS_SECURITY_GROUP_ID=sg-xxxxxxxxx
 AWS_SUBNET_ID=subnet-xxxxxxxxx
 
 # 可选：指定 AMI 或实例类型
-AWS_INSTANCE_TYPE=t3.xlarge
+AWS_INSTANCE_TYPE=c5.2xlarge
 DOCKER_IMAGE=betashow/video-generation-api:latest
 ```
 

@@ -60,7 +60,7 @@ AWS_SECURITY_GROUP_ID=sg-xxxxxxxxx
 AWS_SUBNET_ID=subnet-xxxxxxxxx
 
 # Optional: specific AMI or instance type
-AWS_INSTANCE_TYPE=t3.xlarge
+AWS_INSTANCE_TYPE=c5.2xlarge
 DOCKER_IMAGE=betashow/video-generation-api:latest
 ```
 
