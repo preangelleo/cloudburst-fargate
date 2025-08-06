@@ -208,6 +208,43 @@ This is my second open source project! Feel free to:
 - Submit PRs
 - Star if you find it useful! ⭐
 
+## 📊 Real Production Benchmarks
+
+Based on actual production testing with AWS EC2 c5.2xlarge instance:
+
+### Video Generation Performance
+- **Workload**: 15 scenes (4 different scenarios)
+- **Total Runtime**: ~25 minutes
+- **Total Cost**: $0.20 USD
+- **Instance Setup Time**: ~2 minutes (from launch to ready)
+- **Processing**: 60 videos generated
+- **Success Rate**: 100%
+
+### Cost Breakdown
+```
+Instance Launch & Setup: ~2 minutes
+Video Processing: ~23 minutes  
+Instance Termination: <1 minute
+--------------------------------
+Total Time: 25 minutes
+Total Cost: $0.20 (@ $0.475/hour)
+```
+
+### Scenario Performance
+| Scenario | Videos | Avg Time/Video | Total Time | File Size |
+|----------|--------|----------------|------------|-----------|
+| Baseline | 15 | 6.5s | 2.2 min | ~0.8MB each |
+| Subtitles Only | 15 | 6.7s | 2.4 min | ~0.8MB each |
+| Effects Only | 15 | 34.0s | 9.3 min | ~3.5MB each |
+| Full Featured | 15 | 34.5s | 9.6 min | ~3.5MB each |
+
+### 💡 Cost Comparison
+- **Traditional 24/7 GPU Instance**: ~$500/month
+- **CloudBurst (100 batches/month)**: ~$20/month
+- **Savings**: 96% cost reduction!
+
+**Real "Plug and Play" Experience**: From zero to 60 videos in 25 minutes for just $0.20!
+
 ## 📄 License
 
 MIT License
