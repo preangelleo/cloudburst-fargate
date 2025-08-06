@@ -292,17 +292,17 @@ self.instance_configs = [
 ### 💰 AWS Instance Pricing Reference
 *Last updated: August 6, 2025 20:23 UTC | Region: us-east-1 (N. Virginia) | Linux On-Demand*
 
-| Instance Type | vCPU | RAM | GPU | Category | Hourly Cost | Per Minute | 25-min Job |
-|--------------|------|-----|-----|----------|-------------|------------|------------|
-| **c5.2xlarge** ⭐ | 8 | 16GB | - | CPU Optimized | $0.475 | $0.0079 | $0.20 |
-| **m5.xlarge** | 4 | 16GB | - | Memory Optimized | $0.192 | $0.0032 | $0.08 |
-| **g4dn.xlarge** | 4 | 16GB | T4 16GB | GPU Instance | $0.526 | $0.0088 | $0.22 |
-| t3.xlarge | 4 | 16GB | - | General Purpose | $0.234 | $0.0039 | $0.10 |
-| t3.large | 2 | 8GB | - | General Purpose | $0.083 | $0.0014 | $0.03 |
-| c5.xlarge | 4 | 8GB | - | CPU Optimized | $0.170 | $0.0028 | $0.07 |
-| m5.large | 2 | 8GB | - | Memory Optimized | $0.164 | $0.0027 | $0.07 |
-| c5.4xlarge | 16 | 32GB | - | CPU Optimized | $6.680 | $0.1113 | $2.78 |
-| g4dn.2xlarge | 8 | 32GB | T4 16GB | GPU Instance | $0.752 | $0.0125 | $0.31 |
+| Instance Type | vCPU | RAM | GPU | Hourly Cost | Per Minute | 25-min Job |
+|--------------|------|-----|-----|-------------|------------|------------|
+| **c5.2xlarge** ⭐ | 8 | 16GB | - | $0.475 | $0.0079 | $0.20 |
+| **m5.xlarge** | 4 | 16GB | - | $0.192 | $0.0032 | $0.08 |
+| **g4dn.xlarge** | 4 | 16GB | T4 16GB | $0.526 | $0.0088 | $0.22 |
+| t3.xlarge | 4 | 16GB | - | $0.234 | $0.0039 | $0.10 |
+| t3.large | 2 | 8GB | - | $0.083 | $0.0014 | $0.03 |
+| c5.xlarge | 4 | 8GB | - | $0.170 | $0.0028 | $0.07 |
+| m5.large | 2 | 8GB | - | $0.164 | $0.0027 | $0.07 |
+| c5.4xlarge | 16 | 32GB | - | $6.680 | $0.1113 | $2.78 |
+| g4dn.2xlarge | 8 | 32GB | T4 16GB | $0.752 | $0.0125 | $0.31 |
 
 ⭐ = Default/Recommended instance type
 
