@@ -8,7 +8,7 @@ My second open source project! 🚀
 
 A Python framework that **automatically manages AWS EC2 instances** for on-demand video generation tasks. 
 
-**Core Value**: When your application needs to generate videos (using our [Video Generation API](https://github.com/betashow/video-generation-docker)), this framework:
+**Core Value**: When your application needs to generate videos (using our [Video Generation API](https://github.com/preangelleo/video-generation-docker)), this framework:
 - 🚀 Spins up an EC2 instance with the video generation Docker container
 - 🎬 Processes your video generation requests in parallel
 - 📥 Downloads the completed videos
@@ -19,7 +19,7 @@ A Python framework that **automatically manages AWS EC2 instances** for on-deman
 
 ## 🔗 Related Project
 
-This project builds on my first open source project: [**Video Generation API**](https://github.com/betashow/video-generation-docker)
+This project builds on my first open source project: [**Video Generation API**](https://github.com/preangelleo/video-generation-docker)
 
 - **Video Generation API**: Run a persistent Docker container for video generation (pay monthly)
 - **This Project**: Create on demand, ready when needed; shut down after use, pay by the second

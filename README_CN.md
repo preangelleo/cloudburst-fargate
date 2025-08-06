@@ -8,7 +8,7 @@
 
 一个 **自动管理 AWS EC2 实例** 的 Python 框架，专门用于按需视频生成任务。
 
-**核心价值**：当你的应用需要生成视频时（使用我们的 [视频生成 API](https://github.com/betashow/video-generation-docker)），这个框架会：
+**核心价值**：当你的应用需要生成视频时（使用我们的 [视频生成 API](https://github.com/preangelleo/video-generation-docker)），这个框架会：
 - 🚀 启动一个带有视频生成 Docker 容器的 EC2 实例
 - 🎬 并行处理你的视频生成请求
 - 📥 下载完成的视频
@@ -19,7 +19,7 @@
 
 ## 🔗 相关项目
 
-本项目基于我的第一个开源项目：[**视频生成 API**](https://github.com/betashow/video-generation-docker)
+本项目基于我的第一个开源项目：[**视频生成 API**](https://github.com/preangelleo/video-generation-docker)
 
 - **视频生成 API**：运行持久的 Docker 容器进行视频生成（按月付费）
 - **本项目**：按需创建，随时可用；用完即关，按秒计费
