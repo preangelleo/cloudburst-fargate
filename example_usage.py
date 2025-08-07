@@ -5,9 +5,10 @@ Shows how to integrate this into your own projects with detailed structure examp
 
 ⚡ CRITICAL: DOWNLOAD BEHAVIOR
 ================================
-auto_terminate=True  → Process → Auto-download → Terminate (files in result['downloaded_files'])
-auto_terminate=False → Process → Keep alive (manual download_batch_results() required)
-Default: auto_terminate=False (prevents accidental termination without download)
+NEW: Videos download immediately as each scene is generated!
+auto_terminate=True  → Process & Download each → Terminate (files in result['downloaded_files'])
+auto_terminate=False → Process & Download each → Keep alive (instance available for debugging)
+Default: auto_terminate=False (keeps instance for inspection/retry)
 
 📁 OUTPUT DIRECTORIES:
 - execute_batch: Uses RESULTS_DIR from .env or /tmp/instant_test_results/
@@ -110,8 +111,8 @@ def example_2_custom_scene_list():
     Use this when you have files in different locations or custom naming
     
     IMPORTANT DOWNLOAD BEHAVIOR:
-    - auto_terminate=True: Files are automatically downloaded before instance termination
-    - auto_terminate=False: Instance stays alive; you must manually download and terminate
+    - auto_terminate=True: Files download immediately during processing, then instance terminates
+    - auto_terminate=False: Files download immediately during processing, instance stays alive for debugging
     """
     print("\nExample 2: Custom Scene List")
     print("-" * 40)
@@ -152,27 +153,22 @@ def example_2_custom_scene_list():
         print(f"⏱️  Processing time: {result['total_time']:.1f}s")
         print(f"💰 Processing cost: ${result['cost_usd']:.6f}")
         
-        # Download results to local machine (only needed if auto_terminate=False)
-        # NOTE: If auto_terminate=True, files are already downloaded and available in result['downloaded_files']
-        output_dir = "/path/to/output"
-        download_result = operation.download_batch_results(
-            batch_results=result['batch_results'],          # Pass the batch_results from above
-            output_dir=output_dir,                          # Local directory to save files
-            instance_id=result['instance_id']               # Instance ID from result
-        )
+        # NEW: Files already downloaded during processing!
+        print(f"📥 Downloaded {result['download_count']} files to: {result['download_dir']}")
+        for file_path in result['downloaded_files']:
+            print(f"  → {file_path}")
         
-        # DOWNLOAD RESULT STRUCTURE:
-        # download_result = {
-        #     "download_count": 2,                          # Number of files downloaded
-        #     "downloaded_files": [                         # List of local file paths
-        #         "/path/to/output/intro_scene.mp4",
-        #         "/path/to/output/main_scene.mp4"
-        #     ],
-        #     "final_cost_usd": 0.0195                     # Final cost including download time
-        # }
+        # Optional: Re-download specific files if needed (rarely necessary)
+        # download_result = operation.download_batch_results(
+        #     batch_results=result['batch_results'],
+        #     output_dir="/alternative/output/path",
+        #     instance_id=result['instance_id']
+        # )
         
-        print(f"📥 Downloaded {download_result['download_count']} files")
-        print(f"💰 Final cost: ${download_result['final_cost_usd']:.6f}")
+        # When done, terminate instance if auto_terminate=False
+        if not auto_terminate and result.get('instance_id'):
+            operation.terminate_instance(result['instance_id'])
+            print("✅ Instance terminated")
     
     return result
 

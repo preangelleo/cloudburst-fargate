@@ -90,18 +90,19 @@ aws configure
 
 ## ⚡ Critical: Download Behavior
 
-**IMPORTANT**: Understanding the `auto_terminate` parameter is crucial for successful file downloads:
+**NEW**: Videos are now downloaded **immediately** after each scene is generated for maximum safety!
 
 | Setting | Behavior | When to Use |
 |---------|----------|-------------|
-| `auto_terminate=True` | Process → Auto-download → Terminate | Production batches, CI/CD pipelines |
-| `auto_terminate=False` (default) | Process → Keep alive | Development, debugging, manual control |
+| `auto_terminate=True` | Process & Download each scene → Terminate | Production batches, automated workflows |
+| `auto_terminate=False` (default) | Process & Download each scene → Keep alive | Development, debugging, retry failed downloads |
 
 **Key Points**:
-- ✅ With `auto_terminate=True`: Files are automatically downloaded to `output/` before termination
-- ✅ With `auto_terminate=False`: You must manually call `download_batch_results()` before terminating
-- ✅ Downloaded files are available in `result['downloaded_files']` when using auto-download
-- ⚠️ Default is `False` to prevent accidental termination without downloads
+- ✅ **Immediate downloads**: Each video is saved to disk right after generation
+- ✅ **Interrupt-safe**: If process crashes or you Ctrl+C, you keep all downloaded videos
+- ✅ Downloaded files are in `result['downloaded_files']` and `result['download_dir']`
+- ✅ No more lost work due to download failures or interruptions
+- 📁 Files saved to: `{RESULTS_DIR}/batch_YYYYMMDD_HHMMSS/scene_name.mp4`
 
 ### Output Directory Configuration
 
@@ -292,15 +293,13 @@ result = operation.execute_batch(
 print(f"✅ Processed {result['successful_scenes']} videos")
 print(f"💰 Processing cost: ${result['cost_usd']:.4f}")
 
-# Manual download required when auto_terminate=False
-if result['success'] and result.get('instance_id'):
-    download_result = operation.download_batch_results(
-        batch_results=result['batch_results'],
-        output_dir="./output",
-        instance_id=result['instance_id']
-    )
-    print(f"📥 Downloaded {download_result['download_count']} videos")
-    print(f"💰 Final cost: ${download_result['final_cost_usd']:.4f}")
+# Videos already downloaded during processing!
+print(f"📥 Downloaded {result['download_count']} videos to: {result['download_dir']}")
+
+# Optional: Terminate instance manually when done
+if result.get('instance_id'):
+    operation.terminate_instance(result['instance_id'])
+    print("✅ Instance terminated")
 
 # Output example:
 # ✅ Processed 2 videos
@@ -412,37 +411,37 @@ for file_info in result['downloaded_files']:
 
 ### Download Behavior Examples
 
-**Auto-download (Recommended for Production):**
+**Immediate Downloads (NEW - Default behavior):**
 ```python
-# Files automatically downloaded before termination
+# Videos download immediately as they're generated
 result = operation.execute_batch(
     scenes=scenes,
-    auto_terminate=True  # Process → Download → Terminate
+    auto_terminate=True  # Each scene: Generate → Download → Next → Terminate
 )
 
-# Access downloaded files directly
+# All videos already downloaded during processing!
+print(f"✅ Downloaded {result['download_count']} videos")
+print(f"📁 Saved to: {result['download_dir']}")
 for file_path in result['downloaded_files']:
-    print(f"Video saved: {file_path}")
+    print(f"  → {file_path}")
 ```
 
-**Manual download (For Development/Debugging):**
+**Keep Instance Alive (For debugging or retry):**
 ```python
-# Keep instance alive for inspection
+# Process and download, but keep instance for inspection
 result = operation.execute_batch(
     scenes=scenes,
-    auto_terminate=False  # Process → Keep alive
+    auto_terminate=False  # Generate & Download all → Keep alive
 )
 
-# Manually download when ready
-if result['success']:
-    download_result = operation.download_batch_results(
-        batch_results=result['batch_results'],
-        output_dir="./output",
-        instance_id=result['instance_id']
-    )
-    
-    # Then terminate manually
-    operation.terminate_instance()
+# Videos already downloaded! Instance still running for:
+# - Debugging failed scenes
+# - Re-downloading specific files  
+# - Running additional batches
+
+# Remember to terminate when done:
+if result.get('instance_id'):
+    operation.terminate_instance(result['instance_id'])
 ```
 
 ### Instance Priority (Automatic Fallback)
@@ -572,14 +571,12 @@ Subtitle: scene_024_chinese.srt
 ⏱️  [08:45:16.042] + 75.28s - Scene scene_024_chinese: Sending request to /create_video_onestep...
 ⏱️  [08:46:36.664] +155.90s - Scene scene_024_chinese: Completed - xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (7.17MB) in 80.6s
 ⏱️  [08:46:36.664] +155.90s - Scene scene_024_chinese: API detected scenario: full_featured
+⏱️  [08:45:36.230] + 95.47s - 📥 Downloading scene_024_chinese immediately...
+⏱️  [08:45:41.285] +100.52s - ✅ Downloaded scene_024_chinese: 7.17MB → output/batch_20240807_084516/scene_024_chinese.mp4
 ⏱️  [08:46:36.665] +155.90s - === BATCH PROCESSING COMPLETED: 1/1 scenes successful in 155.90s ===
+⏱️  [08:46:36.665] +155.90s - ✅ Downloaded 1 videos to: output/batch_20240807_084516
 ⏱️  [08:46:36.665] +155.90s - Current estimated cost: $0.020336 (runtime: 2.57min)
-⏱️  [08:46:36.665] +155.90s - ⚠️  Keeping instance alive for batch downloads...
-⏱️  [08:46:36.665] +155.90s - Auto-downloading results before termination...
-⏱️  [08:46:36.665] +155.90s - Downloading scene_024_chinese... (1/1)
-⏱️  [08:46:41.726] +160.96s - Downloaded scene_024_chinese: 7.17MB
-⏱️  [08:46:41.726] +160.96s - FINAL COST: $0.021004 (total runtime: 2.65min)
-⏱️  [08:46:41.726] +160.96s - All downloads completed (1/1), terminating instance...
+⏱️  [08:46:36.665] +155.90s - ⚠️  Keeping instance alive for potential retry downloads...
 ⏱️  [08:46:41.726] +160.96s - Terminating instance: i-0xxxxxxxxxxxxxxxxx
 ⏱️  [08:46:42.958] +162.19s - Instance termination initiated
 ⏱️  [08:46:42.959] +162.20s - Downloaded 1 files to: /path/to/project/Temps/instant_test_results/batch_20250807_084636
