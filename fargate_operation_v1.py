@@ -63,7 +63,7 @@ class FargateOperationV1:
                 "cost_efficiency": "Medium",
                 "cost_per_hour": 0.17544
             },
-{
+            {
                 "priority": 3,
                 "cpu": "8192",  # 8 vCPU
                 "memory": "16384",  # 16GB
@@ -102,7 +102,9 @@ class FargateOperationV1:
         if 1 <= config_priority <= 5:
             self.current_config = self.task_configs[config_priority - 1]
         else:
-            self.current_config = self.task_configs[0]  # Default to standard
+            # Fallback order: CPU high to low (16→8→4→2→1 vCPU)
+            fallback_order = [3, 2, 1, 0, 4]  # priority 4,3,2,1,5 (16,8,4,2,1 vCPU)
+            self.current_config = self.task_configs[fallback_order[0]]  # Default to 16 vCPU (priority 4)
             
         # ECS Configuration (Fixed values - not sensitive)
         self.cluster_name = 'cloudburst-cluster'  # Fixed cluster name
@@ -220,6 +222,25 @@ class FargateOperationV1:
                 f"Please check your .env file or set these environment variables.\n"
                 f"For ECS Fargate, you need cluster name, task definition, subnet, and security group."
             )
+    
+    def check_aws_account_validity(self) -> Dict:
+        """Check if AWS account and credentials are valid"""
+        try:
+            # Use STS to get caller identity
+            sts_client = self.session.client('sts')
+            identity = sts_client.get_caller_identity()
+            
+            return {
+                'valid': True,
+                'account_id': identity.get('Account'),
+                'user_arn': identity.get('Arn'),
+                'message': 'AWS credentials are valid'
+            }
+        except Exception as e:
+            return {
+                'valid': False,
+                'message': f'AWS credentials invalid: {str(e)}'
+            }
     
     def log_timing(self, event: str):
         """Log timing for performance analysis"""
@@ -861,12 +882,12 @@ def calculate_optimal_batch_distribution(total_scenes: int,
 
 
 def execute_parallel_batches(scenes: List[Dict], 
-                           scenes_per_batch: int = 2,
+                           scenes_per_batch: int = 10,
                            language: str = "chinese",
                            enable_zoom: bool = True,
-                           config_priority: int = 1,
-                           max_parallel_tasks: int = 2,  # Changed from max_parallel_instances
-                           min_scenes_per_batch: int = 2,
+                           config_priority: int = 4,
+                           max_parallel_tasks: int = 10,  # Changed from max_parallel_instances
+                           min_scenes_per_batch: int = 5,
                            watermark_path: str = None,
                            is_portrait: bool = False,
                            saving_dir: str = None,
