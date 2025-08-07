@@ -2,6 +2,11 @@
 
 My second open source project, now powered by **AWS ECS Fargate**! 🚀
 
+> **📚 Related Projects**: 
+> - **Original CloudBurst (EC2)**: https://github.com/preangelleo/sumatman/tree/main/runpod/cloudburst
+> - **Video Generation API**: https://github.com/preangelleo/video-generation-docker
+> - **中文文档**: [README_CN.md](./README_CN.md)
+
 ## What is this?
 
 A production-ready Python framework that uses **AWS ECS Fargate** for serverless, on-demand video generation with **parallel processing capabilities**.
