@@ -248,7 +248,7 @@ Here's what you can expect from the generated videos:
 [![English Video Example](https://img.youtube.com/vi/JiWsyuyw1ao/maxresdefault.jpg)](https://www.youtube.com/watch?v=JiWsyuyw1ao)
 
 **Chinese Example**:
-[![Chinese Video Example](https://img.youtube.com/vi/WYFyUAk9F6k/maxresdefault.jpg)](https://www.youtube.com/watch?v=WYFyUAk9F6k)
+[![Chinese Video Example](https://img.youtube.com/vi/eJtuwBV_7qY/maxresdefault.jpg)](https://www.youtube.com/watch?v=eJtuwBV_7qY)
 
 **Video Features Demonstrated**:
 - ✅ Professional subtitles with background
@@ -621,25 +621,48 @@ This is my second open source project! Feel free to:
 
 ## 📊 Real Production Benchmarks
 
-Based on actual production testing with AWS EC2 c5.2xlarge instance:
+### 🚀 Latest Production Test: 55 Scenes Parallel Processing (August 7, 2025)
 
-### Video Generation Performance
-- **Workload**: 15 scenes (4 different scenarios)
-- **Total Runtime**: ~25 minutes
-- **Total Cost**: $0.20 USD
-- **Instance Setup Time**: ~2 minutes (from launch to ready)
-- **Processing**: 60 videos generated
-- **Success Rate**: 100%
+**Real-world test results from RunPod production environment:**
 
-### Cost Breakdown
 ```
-Instance Launch & Setup: ~2 minutes
-Video Processing: ~23 minutes  
-Instance Termination: <1 minute
---------------------------------
-Total Time: 25 minutes
-Total Cost: $0.20 (@ $0.475/hour)
+============================================================
+🚀 PARALLEL BATCH PROCESSING COMPLETE
+============================================================
+✅ Successful scenes: 55/55
+❌ Failed scenes: 0
+💰 Total cost: $0.7184
+⏱️  Parallel time: 588.4s (saved 4861.9s)
+🚀 Speedup: 9.26x faster
+📥 Downloaded files: 55 videos
+📁 Files saved in 3 directories
 ```
+
+**Key Metrics:**
+- **Workload**: 55 educational story scenes
+- **Success Rate**: 100% (55/55)
+- **Parallel Processing Time**: 9.8 minutes (588.4 seconds)
+- **Sequential Time (if not parallel)**: 91 minutes (5450.3 seconds)
+- **Time Saved**: 81.2 minutes (4861.9 seconds)
+- **Speedup Factor**: 9.26x faster
+- **Total Cost**: $0.72 USD
+- **Cost per Scene**: $0.013 USD
+
+### Performance Analysis
+
+Based on actual production testing with AWS EC2 c5.2xlarge instances:
+
+#### Parallel Processing Distribution (55 scenes)
+- **Batch 1**: 5 scenes → Completed in ~9 minutes
+- **Batch 2**: 12 scenes → Completed in ~9 minutes  
+- **Batch 3**: 38 scenes → Completed in ~9 minutes
+- **Total**: 3 instances running simultaneously
+
+#### Video Generation Performance (Historical)
+- **15 scenes test**: ~25 minutes, $0.20 USD
+- **55 scenes test**: ~9.8 minutes (parallel), $0.72 USD
+- **Instance Setup Time**: ~2 minutes per instance
+- **Success Rate**: 100% across all tests
 
 ### Scenario Performance
 | Scenario | Videos | Avg Time/Video | Total Time | File Size |
@@ -654,7 +677,7 @@ Total Cost: $0.20 (@ $0.475/hour)
 - **CloudBurst (100 batches/month)**: ~$20/month
 - **Savings**: 96% cost reduction!
 
-**Real "Plug and Play" Experience**: From zero to 60 videos in 25 minutes for just $0.20!
+**Real "Plug and Play" Experience**: From zero to 55 videos in under 10 minutes for just $0.72!
 
 ## 📄 License
 
