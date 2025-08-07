@@ -9,11 +9,10 @@
 .env.*.local
 
 # =============================================================================
-# Documentation and Examples (Excluded from Open Source)
+# Internal Documentation (Excluded from Open Source)
 # =============================================================================
 docs/
-example_usage.py
-# Note: README_CN.md is now included for Chinese users
+# Note: example_usage.py is now included for users to learn the API
 
 # =============================================================================
 # Backup and Test Files

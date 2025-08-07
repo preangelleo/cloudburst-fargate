@@ -3,7 +3,7 @@
 我的第二个开源项目，现已升级到 **AWS ECS Fargate** 架构！🚀
 
 > **📚 相关项目**: 
-> - **原版 CloudBurst (EC2)**: https://github.com/preangelleo/sumatman/tree/main/runpod/cloudburst
+> - **原版 CloudBurst (EC2)**: https://github.com/preangelleo/cloudburst
 > - **视频生成 API**: https://github.com/preangelleo/video-generation-docker
 > - **English Version**: [README.md](./README.md)
 
