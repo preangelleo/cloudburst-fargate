@@ -1,4 +1,4 @@
-# Instant Instance Operation
+# Cloudburst - Instant Instance Operation
 
 My second open source project! 🚀
 
@@ -88,6 +88,54 @@ aws configure
 
 **Note**: You don't need to create any files manually. Just set the environment variables or use AWS CLI.
 
+## ⚡ Critical: Download Behavior
+
+**IMPORTANT**: Understanding the `auto_terminate` parameter is crucial for successful file downloads:
+
+| Setting | Behavior | When to Use |
+|---------|----------|-------------|
+| `auto_terminate=True` | Process → Auto-download → Terminate | Production batches, CI/CD pipelines |
+| `auto_terminate=False` (default) | Process → Keep alive | Development, debugging, manual control |
+
+**Key Points**:
+- ✅ With `auto_terminate=True`: Files are automatically downloaded to `output/` before termination
+- ✅ With `auto_terminate=False`: You must manually call `download_batch_results()` before terminating
+- ✅ Downloaded files are available in `result['downloaded_files']` when using auto-download
+- ⚠️ Default is `False` to prevent accidental termination without downloads
+
+### Output Directory Configuration
+
+All processing functions now support a `saving_dir` parameter with the same 3-tier priority:
+1. **User-provided `saving_dir`** (highest priority)
+2. **`RESULTS_DIR` from environment/.env**
+3. **Default: `./cloudburst_results/`**
+
+**Single batch processing (`execute_batch`)**:
+```python
+result = operation.execute_batch(
+    scenes=scenes,
+    saving_dir="/path/to/my/videos"  # Optional: specify where to save
+)
+# Files saved to: {saving_dir}/batch_YYYYMMDD_HHMMSS/
+```
+
+**Parallel processing (`execute_parallel_batches`)**:
+```python
+result = execute_parallel_batches(
+    scenes=scenes,
+    saving_dir="/path/to/my/videos"  # Optional: specify where to save
+)
+# Files saved to: {saving_dir}/batch_N_timestamp/
+```
+
+**Folder scanning (`scan_and_test_folder`)**:
+```python
+result = scan_and_test_folder(
+    folder_path="./scenes",
+    saving_dir="/path/to/my/videos"  # Optional: specify where to save
+)
+```
+
 ## 🚀 Quick Start
 
 ### 1. Install
@@ -148,7 +196,7 @@ total_cost = operation.terminate_instance()
 print(f"Total cost: ${total_cost:.4f}")
 ```
 
-## 📊 Real Example - Video Generation
+## 📊 Real Examples - Video Generation
 
 ### Method 1: Automatic Folder Scanning
 
@@ -170,6 +218,7 @@ video_scenes/
 ```python
 from instant_instance_operation_v2 import scan_and_test_folder
 
+# Note: scan_and_test_folder uses auto_terminate=True by default!
 result = scan_and_test_folder(
     folder_path="./video_scenes/",
     language="chinese",
@@ -178,6 +227,12 @@ result = scan_and_test_folder(
 
 print(f"✅ Generated {result['successful_scenes']} videos")
 print(f"💰 Total cost: ${result['cost_usd']:.4f}")
+
+# Files are automatically downloaded!
+if result.get('downloaded_files'):
+    print(f"📥 Videos saved to: {result['output_directory']}")
+    for file_path in result['downloaded_files']:
+        print(f"   🎬 {file_path}")
 ```
 
 ### 🎬 Output Examples
@@ -223,19 +278,101 @@ scenes = [
 ]
 
 # Process scenes
-result = operation.execute_batch_test(
+result = operation.execute_batch(
     scenes=scenes,
     language="english",
-    enable_zoom=True
+    enable_zoom=True,
+    auto_terminate=False  # Keep alive for manual download
 )
 
 print(f"✅ Processed {result['successful_scenes']} videos")
-print(f"💰 Total cost: ${result['cost_usd']:.4f}")
+print(f"💰 Processing cost: ${result['cost_usd']:.4f}")
+
+# Manual download required when auto_terminate=False
+if result['success'] and result.get('instance_id'):
+    download_result = operation.download_batch_results(
+        batch_results=result['batch_results'],
+        output_dir="./output",
+        instance_id=result['instance_id']
+    )
+    print(f"📥 Downloaded {download_result['download_count']} videos")
+    print(f"💰 Final cost: ${download_result['final_cost_usd']:.4f}")
 
 # Output example:
 # ✅ Processed 2 videos
-# 💰 Total cost: $0.0187
+# 💰 Processing cost: $0.0187
+# 📥 Downloaded 2 videos
+# 💰 Final cost: $0.0195
 ```
+
+### Method 3: Parallel Processing for Large Batches
+
+Process 100+ scenes across multiple instances simultaneously:
+
+```python
+from instant_instance_operation_v2 import execute_parallel_batches
+
+# Process 100 scenes using 10 instances
+# Note: execute_parallel_batches uses auto_terminate=True by default!
+result = execute_parallel_batches(
+    scenes=my_100_scenes,       # Your list of 100+ scenes
+    scenes_per_batch=10,        # Preferred scenes per instance
+    language="english",
+    enable_zoom=True,
+    max_parallel_instances=10,  # Launch up to 10 instances at once
+    min_scenes_per_batch=5,     # Minimum 5 scenes per instance (avoid startup waste)
+    saving_dir="./my_videos"    # Optional: Where to save videos (default: ./cloudburst_results/)
+)
+
+# Return structure includes efficiency metrics:
+print(f"✅ Processed {result['successful_scenes']}/{result['total_scenes']} scenes")
+print(f"💰 Total cost: ${result['total_cost_usd']:.4f}")
+print(f"⏱️  Parallel time: {result['parallel_time']:.1f}s")
+print(f"🚀 Speedup: {result['efficiency']['speedup_factor']:.1f}x faster!")
+print(f"📥 Downloaded: {len(result['downloaded_files'])} videos")
+
+# Access downloaded videos
+for file_info in result['downloaded_files']:
+    print(f"Batch {file_info['batch_id']}: {file_info['file_path']}")
+
+# Output example:
+# ✅ Processed 98/100 scenes  
+# 💰 Total cost: $2.1534
+# ⏱️  Parallel time: 265.3s
+# 🚀 Speedup: 9.4x faster!
+# 📥 Downloaded: 98 videos
+# 📁 Files saved in: /tmp/batch_*/ directories
+```
+
+**Smart Distribution Algorithm:**
+- Total scenes ≤ preferred × max_instances: Uses preferred scenes_per_batch
+- Total scenes > preferred × max_instances: Evenly distributes across all instances
+- Automatically adjusts to ensure each instance processes ≥ min_scenes_per_batch
+
+**Distribution Examples:**
+- 50 scenes, batch=10, min=5 → 5 instances × 10 scenes
+- 120 scenes, batch=10, min=5 → 10 instances × 12 scenes (even distribution)
+- 24 scenes, batch=10, min=8 → 3 instances × 8 scenes (avoid waste)
+
+**Key Benefits:**
+- **10x faster** than sequential processing
+- **Same total cost** (you pay for compute time either way)
+- **Smart allocation** - optimizes instance usage based on minimum scenes
+- **Automatic downloads** - all videos saved locally before instances terminate (auto_terminate=True by default)
+- **Triple-layer safety** - guaranteed instance cleanup even on errors
+- **Results sorted by scene_name** for easy processing
+
+**Safety Features:**
+- ✅ Automatic instance termination after downloads
+- ✅ Immediate cleanup on batch failures  
+- ✅ Emergency cleanup in case of unexpected errors
+- ✅ No instances left running = no surprise bills
+
+**Perfect for:**
+- Processing entire video courses (50-200 scenes)
+- Bulk content generation for multiple clients
+- Time-sensitive batch jobs that need to complete quickly
+- Production workloads requiring cost control
 
 ## 💡 Key Features
 
@@ -268,6 +405,41 @@ print(f"💰 Total cost: ${result['cost_usd']:.4f}")
 - **🎨 Rendering** - 3D rendering, image processing
 
 ## 🛠️ Advanced Configuration
+
+### Download Behavior Examples
+
+**Auto-download (Recommended for Production):**
+```python
+# Files automatically downloaded before termination
+result = operation.execute_batch(
+    scenes=scenes,
+    auto_terminate=True  # Process → Download → Terminate
+)
+
+# Access downloaded files directly
+for file_path in result['downloaded_files']:
+    print(f"Video saved: {file_path}")
+```
+
+**Manual download (For Development/Debugging):**
+```python
+# Keep instance alive for inspection
+result = operation.execute_batch(
+    scenes=scenes,
+    auto_terminate=False  # Process → Keep alive
+)
+
+# Manually download when ready
+if result['success']:
+    download_result = operation.download_batch_results(
+        batch_results=result['batch_results'],
+        output_dir="./output",
+        instance_id=result['instance_id']
+    )
+    
+    # Then terminate manually
+    operation.terminate_instance()
+```
 
 ### Instance Priority (Automatic Fallback)
 ```python
@@ -336,6 +508,107 @@ self.instance_configs = [
 - Python 3.7+
 - AWS Account with EC2 permissions
 - boto3, requests, python-dotenv
+
+## 🖥️ Real Terminal Output Example
+
+Here's exactly what you'll see when processing a video with CloudBurst:
+
+### Key Metrics from This Example:
+- **Scene Details**: Single 27-second scene with Chinese audio and subtitles
+- **Total Time**: 155.9 seconds (2.6 minutes) from start to finish
+- **Processing Breakdown**:
+  - Instance creation & boot: ~10 seconds
+  - Docker container ready: ~75 seconds
+  - Video generation: ~80 seconds
+  - File download: ~5 seconds
+  - Instance termination: ~2 seconds
+- **Cost**: $0.021 (about 2 cents for a 27-second video)
+- **Output**: 7.2MB MP4 file with zoom effects and Chinese subtitles
+
+```
+~/coding % python3 test_cloudburst_auto_download.py
+⚠️  WARNING: This will create an AWS EC2 instance and incur charges!
+   Estimated cost: ~$0.01-0.02 for a single scene
+
+✨ NEW: auto_terminate=True now downloads files automatically!
+
+Do you want to continue? (yes/no): yes
+🚀 Testing CloudBurst with automatic download
+============================================================
+Scene: scene_024_chinese
+Image: scene_024_chinese.png
+Audio: scene_024_chinese.mp3
+Subtitle: scene_024_chinese.srt
+============================================================
+⏱️  [08:44:00.763] +  0.00s - === BATCH INSTANT OPERATION START (1 scenes) ===
+⏱️  [08:44:00.763] +  0.00s - Starting smart AWS instance creation
+⏱️  [08:44:00.763] +  0.00s - 🔍 Checking instance availability before creation...
+⏱️  [08:44:01.565] +  0.80s - ✅ Selected instance c5.2xlarge is available in 5 zones
+⏱️  [08:44:02.537] +  1.77s - Instance pricing: $0.4750/hour (c5.2xlarge)
+⏱️  [08:44:02.537] +  1.77s - 🚀 Attempting to create instance: c5.2xlarge (attempt 1/3)
+⏱️  [08:44:04.222] +  3.46s - ✅ Instance created successfully: i-0xxxxxxxxxxxxxxxxx
+⏱️  [08:44:04.222] +  3.46s - Waiting for instance to be running...
+⏱️  [08:44:10.212] +  9.45s - Instance running at IP: 3.xxx.xxx.xxx
+⏱️  [08:44:10.212] +  9.45s - Waiting for Docker API to be ready...
+⏱️  [08:44:13.404] + 12.64s - Still waiting for API... attempt 1/120
+⏱️  [08:45:05.386] + 64.62s - Still waiting for API... attempt 11/120
+⏱️  [08:45:16.021] + 75.26s - Docker API is ready and healthy
+
+⏱️  [08:45:16.022] + 75.26s - 📥 AUTO-DOWNLOAD ENABLED: Files will be downloaded automatically before termination
+
+⏱️  [08:45:16.022] + 75.26s - === Processing Scene 1/1 ===
+⏱️  [08:45:16.022] + 75.26s - Processing scene: scene_024_chinese
+⏱️  [08:45:16.041] + 75.28s - Scene scene_024_chinese: Files encoded (with subtitles)
+⏱️  [08:45:16.041] + 75.28s - Scene scene_024_chinese: Adding subtitle to request (length: 1680 chars)
+⏱️  [08:45:16.041] + 75.28s - Scene scene_024_chinese: Using unified API endpoint (expected scenario: full_featured)
+⏱️  [08:45:16.041] + 75.28s - Scene scene_024_chinese: Request has effects: ['zoom_in', 'zoom_out'] (enable_zoom=True)
+⏱️  [08:45:16.041] + 75.28s - Scene scene_024_chinese: Request has subtitle: True (length=1680 chars)
+⏱️  [08:45:16.041] + 75.28s - Scene scene_024_chinese: Request language: chinese
+⏱️  [08:45:16.042] + 75.28s - Scene scene_024_chinese: Debug request saved to /path/to/project/Temps/debug_request_scene_024_chinese.json
+⏱️  [08:45:16.042] + 75.28s - Scene scene_024_chinese: Sending request to /create_video_onestep...
+⏱️  [08:46:36.664] +155.90s - Scene scene_024_chinese: Completed - xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (7.17MB) in 80.6s
+⏱️  [08:46:36.664] +155.90s - Scene scene_024_chinese: API detected scenario: full_featured
+⏱️  [08:46:36.665] +155.90s - === BATCH PROCESSING COMPLETED: 1/1 scenes successful in 155.90s ===
+⏱️  [08:46:36.665] +155.90s - Current estimated cost: $0.020336 (runtime: 2.57min)
+⏱️  [08:46:36.665] +155.90s - ⚠️  Keeping instance alive for batch downloads...
+⏱️  [08:46:36.665] +155.90s - Auto-downloading results before termination...
+⏱️  [08:46:36.665] +155.90s - Downloading scene_024_chinese... (1/1)
+⏱️  [08:46:41.726] +160.96s - Downloaded scene_024_chinese: 7.17MB
+⏱️  [08:46:41.726] +160.96s - FINAL COST: $0.021004 (total runtime: 2.65min)
+⏱️  [08:46:41.726] +160.96s - All downloads completed (1/1), terminating instance...
+⏱️  [08:46:41.726] +160.96s - Terminating instance: i-0xxxxxxxxxxxxxxxxx
+⏱️  [08:46:42.958] +162.19s - Instance termination initiated
+⏱️  [08:46:42.959] +162.20s - Downloaded 1 files to: /path/to/project/Temps/instant_test_results/batch_20250807_084636
+
+============================================================
+📊 CLOUDBURST RESULTS
+============================================================
+✅ Success: 1/1 scenes processed
+💰 Final cost: $0.0210
+⏱️  Total time: 155.9 seconds
+🖥️  Instance type: c5.2xlarge
+
+📥 Downloaded 1 files automatically!
+📁 Output directory: /path/to/project/Temps/instant_test_results/batch_20250807_084636
+   🎬 /path/to/project/Temps/instant_test_results/batch_20250807_084636/scene_024_chinese_20250807_084641.mp4 (7.2 MB)
+
+✅ Test completed!
+```
+
+### What This Tells You:
+1. **Detailed Timing**: Every step is timestamped so you know exactly where time is spent
+2. **Smart Instance Selection**: Automatically checks availability across AWS zones
+3. **Real-time Progress**: See when Docker is loading, when processing starts, and download progress
+4. **Cost Transparency**: Shows hourly rate ($0.475/hour) and final cost ($0.021)
+5. **Automatic Downloads**: Files are saved locally before instance termination
+6. **Clean Shutdown**: Instance is properly terminated to avoid ongoing charges
+
+### Performance Insights:
+- **Setup Overhead**: ~75 seconds for AWS instance + Docker (one-time cost per batch)
+- **Processing Speed**: ~3 seconds per second of video (27-second audio → 80 seconds processing)
+- **Cost Efficiency**: $0.021 for one video, but if you process 100 videos in the same batch, the setup cost is amortized
+
+This example shows the "full_featured" scenario with both subtitles and zoom effects, which takes the longest to process but produces the highest quality output.
 
 ## 🤝 Contributing
 

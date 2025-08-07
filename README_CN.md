@@ -88,6 +88,54 @@ aws configure
 
 **注意**：您无需手动创建任何文件。只需设置环境变量或使用 AWS CLI 即可。
 
+## ⚡ 重要：下载行为说明
+
+**重要**：理解 `auto_terminate` 参数对成功下载文件至关重要：
+
+| 设置 | 行为 | 使用场景 |
+|------|------|----------|
+| `auto_terminate=True` | 处理 → 自动下载 → 终止 | 生产批处理、CI/CD 流水线 |
+| `auto_terminate=False`（默认） | 处理 → 保持运行 | 开发、调试、手动控制 |
+
+**关键点**：
+- ✅ 使用 `auto_terminate=True`：文件在终止前自动下载到 `output/` 目录
+- ✅ 使用 `auto_terminate=False`：你必须手动调用 `download_batch_results()` 后再终止
+- ✅ 使用自动下载时，下载的文件路径在 `result['downloaded_files']` 中
+- ⚠️ 默认值为 `False`，防止意外终止而丢失文件
+
+### 输出目录配置
+
+所有处理函数现在都支持 `saving_dir` 参数，使用相同的三级优先级：
+1. **用户提供的 `saving_dir`**（最高优先级）
+2. **环境变量/.env 中的 `RESULTS_DIR`**
+3. **默认值：`./cloudburst_results/`**
+
+**单批次处理（`execute_batch`）**：
+```python
+result = operation.execute_batch(
+    scenes=scenes,
+    saving_dir="/path/to/my/videos"  # 可选：指定保存位置
+)
+# 文件保存到：{saving_dir}/batch_YYYYMMDD_HHMMSS/
+```
+
+**并行处理（`execute_parallel_batches`）**：
+```python
+result = execute_parallel_batches(
+    scenes=scenes,
+    saving_dir="/path/to/my/videos"  # 可选：指定保存位置
+)
+# 文件保存到：{saving_dir}/batch_N_timestamp/
+```
+
+**文件夹扫描（`scan_and_test_folder`）**：
+```python
+result = scan_and_test_folder(
+    folder_path="./scenes",
+    saving_dir="/path/to/my/videos"  # 可选：指定保存位置
+)
+```
+
 ## 🚀 快速开始
 
 ### 1. 安装
@@ -135,6 +183,7 @@ video_scenes/
 ```python
 from instant_instance_operation_v2 import scan_and_test_folder
 
+# 注意：scan_and_test_folder 默认使用 auto_terminate=True！
 result = scan_and_test_folder(
     folder_path="./video_scenes/",
     language="chinese",
@@ -143,6 +192,12 @@ result = scan_and_test_folder(
 
 print(f"✅ 生成了 {result['successful_scenes']} 个视频")
 print(f"💰 总成本：${result['cost_usd']:.4f}")
+
+# 文件已自动下载！
+if result.get('downloaded_files'):
+    print(f"📥 视频保存到：{result['output_directory']}")
+    for file_path in result['downloaded_files']:
+        print(f"   🎬 {file_path}")
 ```
 
 ### 🎬 输出效果示例
@@ -184,19 +239,101 @@ scenes = [
 ]
 
 # 处理场景
-result = operation.execute_batch_test(
+result = operation.execute_batch(
     scenes=scenes,
     language="chinese",
-    enable_zoom=True
+    enable_zoom=True,
+    auto_terminate=False  # 保持运行，需手动下载
 )
 
 print(f"✅ 处理了 {result['successful_scenes']} 个视频")
-print(f"💰 总成本：${result['cost_usd']:.4f}")
+print(f"💰 处理成本：${result['cost_usd']:.4f}")
+
+# 当 auto_terminate=False 时需要手动下载
+if result['success'] and result.get('instance_id'):
+    download_result = operation.download_batch_results(
+        batch_results=result['batch_results'],
+        output_dir="./output",
+        instance_id=result['instance_id']
+    )
+    print(f"📥 下载了 {download_result['download_count']} 个视频")
+    print(f"💰 最终成本：${download_result['final_cost_usd']:.4f}")
 
 # 输出示例：
 # ✅ 处理了 2 个视频
-# 💰 总成本：$0.0187
+# 💰 处理成本：$0.0187
+# 📥 下载了 2 个视频
+# 💰 最终成本：$0.0195
 ```
+
+### 方法 3：大批量并行处理
+
+同时在多个实例上处理 100+ 个场景：
+
+```python
+from instant_instance_operation_v2 import execute_parallel_batches
+
+# 使用 10 个实例处理 100 个场景
+# 注意：execute_parallel_batches 默认使用 auto_terminate=True！
+result = execute_parallel_batches(
+    scenes=my_100_scenes,       # 你的 100+ 个场景列表
+    scenes_per_batch=10,        # 每个实例期望处理的场景数
+    language="chinese",
+    enable_zoom=True,
+    max_parallel_instances=10,  # 同时启动最多 10 个实例
+    min_scenes_per_batch=5,     # 每个实例最少处理 5 个场景（避免启动成本浪费）
+    saving_dir="./my_videos"    # 可选：指定保存视频的目录（默认：./cloudburst_results/）
+)
+
+# 返回结果包含效率指标：
+print(f"✅ 处理完成 {result['successful_scenes']}/{result['total_scenes']} 个场景")
+print(f"💰 总成本：${result['total_cost_usd']:.4f}")
+print(f"⏱️  并行时间：{result['parallel_time']:.1f}秒")
+print(f"🚀 加速比：{result['efficiency']['speedup_factor']:.1f}倍速度！")
+print(f"📥 已下载：{len(result['downloaded_files'])} 个视频")
+
+# 访问下载的视频
+for file_info in result['downloaded_files']:
+    print(f"批次 {file_info['batch_id']}: {file_info['file_path']}")
+
+# 输出示例：
+# ✅ 处理完成 98/100 个场景
+# 💰 总成本：$2.1534
+# ⏱️  并行时间：265.3秒
+# 🚀 加速比：9.4倍速度！
+# 📥 已下载：98 个视频
+# 📁 文件保存在：/tmp/batch_*/ 目录中
+```
+
+**智能分配算法：**
+- 总场景数 ≤ 期望值 × 最大实例数：使用期望的 scenes_per_batch
+- 总场景数 > 期望值 × 最大实例数：均匀分配到所有实例
+- 自动调整以确保每个实例至少处理 min_scenes_per_batch 个场景
+
+**分配示例：**
+- 50 场景，batch=10，min=5 → 5 个实例 × 10 场景
+- 120 场景，batch=10，min=5 → 10 个实例 × 12 场景（均匀分配）
+- 24 场景，batch=10，min=8 → 3 个实例 × 8 场景（避免浪费）
+
+**核心优势：**
+- **速度提升 10 倍** 相比顺序处理
+- **成本相同**（无论如何都要支付计算时间）
+- **智能分配** - 根据最小场景数自动优化实例使用
+- **自动下载** - 所有视频在实例终止前自动保存到本地（默认 auto_terminate=True）
+- **三重安全保障** - 即使出错也保证实例清理
+- **结果按场景名排序** 便于后续处理
+
+**安全特性：**
+- ✅ 下载完成后自动终止实例
+- ✅ 批处理失败时立即清理
+- ✅ 意外错误时紧急清理机制
+- ✅ 确保无实例遗留 = 无意外账单
+
+**适用场景：**
+- 处理完整的视频课程（50-200 个场景）
+- 为多个客户批量生成内容
+- 需要快速完成的时间敏感批处理任务
+- 需要成本控制的生产工作负载
 
 ## 📊 真实案例
 
@@ -240,6 +377,41 @@ print(f"💰 总成本：${result['cost_usd']:.4f}")
 - **🎨 渲染** - 3D 渲染、图像处理
 
 ## 🛠️ 高级配置
+
+### 下载行为示例
+
+**自动下载（生产环境推荐）：**
+```python
+# 文件在终止前自动下载
+result = operation.execute_batch(
+    scenes=scenes,
+    auto_terminate=True  # 处理 → 下载 → 终止
+)
+
+# 直接访问已下载的文件
+for file_path in result['downloaded_files']:
+    print(f"视频已保存：{file_path}")
+```
+
+**手动下载（用于开发/调试）：**
+```python
+# 保持实例运行以便检查
+result = operation.execute_batch(
+    scenes=scenes,
+    auto_terminate=False  # 处理 → 保持运行
+)
+
+# 准备好后手动下载
+if result['success']:
+    download_result = operation.download_batch_results(
+        batch_results=result['batch_results'],
+        output_dir="./output",
+        instance_id=result['instance_id']
+    )
+    
+    # 然后手动终止
+    operation.terminate_instance()
+```
 
 ### 实例优先级（自动回退）
 ```python

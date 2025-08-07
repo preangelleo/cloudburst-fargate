@@ -2,16 +2,30 @@
 """
 Example usage of InstantInstanceOperation v2 for developers
 Shows how to integrate this into your own projects with detailed structure examples
+
+⚡ CRITICAL: DOWNLOAD BEHAVIOR
+================================
+auto_terminate=True  → Process → Auto-download → Terminate (files in result['downloaded_files'])
+auto_terminate=False → Process → Keep alive (manual download_batch_results() required)
+Default: auto_terminate=False (prevents accidental termination without download)
+
+📁 OUTPUT DIRECTORIES:
+- execute_batch: Uses RESULTS_DIR from .env or /tmp/instant_test_results/
+- execute_parallel_batches: Uses saving_dir parameter or ./cloudburst_results/
+================================
 """
 
 import os
 import json
 import time
-from instant_instance_operation_v2 import InstantInstanceOperationV2, scan_and_test_folder
+from instant_instance_operation_v2 import InstantInstanceOperationV2, scan_and_test_folder, execute_parallel_batches
 
 def example_1_simple_folder_scan():
     """
     Example 1: Simplest usage - scan a folder and process all scenes
+    
+    NOTE: scan_and_test_folder() uses auto_terminate=False by default,
+    so instance stays alive for manual download or further processing!
     
     FOLDER STRUCTURE REQUIRED:
     your_scenes_folder/
@@ -36,7 +50,8 @@ def example_1_simple_folder_scan():
         folder_path="/path/to/your/scenes",  # Root folder containing images/, audio/, subtitle/
         language="chinese",                   # "chinese" or "english"
         enable_zoom=True,                    # True = effects enabled, False = no effects
-        config_priority=1                    # 1=GPU, 2=High-CPU, 3=Balanced
+        config_priority=1,                   # 1=GPU, 2=High-CPU, 3=Balanced
+        saving_dir="/path/to/save/videos"    # Optional: where to save videos (uses RESULTS_DIR by default)
     )
     
     # RETURN STRUCTURE:
@@ -70,10 +85,17 @@ def example_1_simple_folder_scan():
         print(f"✅ Generated {len(download_urls)} videos")
         print(f"💰 Total cost: ${total_cost:.6f}")
         
+        # Check if files were auto-downloaded (scan_and_test_folder uses auto_terminate=True)
+        if result.get('downloaded_files'):
+            print(f"📥 Files auto-downloaded to: {result.get('output_directory', 'output')}")
+            for file_path in result['downloaded_files']:
+                print(f"   🎬 {file_path}")
+        
         # Example: Save to your database
         database_record = {
             "batch_id": f"batch_{int(time.time())}",
             "download_urls": download_urls,      # List of URLs
+            "local_files": result.get('downloaded_files', []),  # Local file paths if auto-downloaded
             "cost_usd": total_cost,             # Direct float value
             "processing_time": result["total_time"]
         }
@@ -86,6 +108,10 @@ def example_2_custom_scene_list():
     """
     Example 2: Process specific scenes with custom configuration
     Use this when you have files in different locations or custom naming
+    
+    IMPORTANT DOWNLOAD BEHAVIOR:
+    - auto_terminate=True: Files are automatically downloaded before instance termination
+    - auto_terminate=False: Instance stays alive; you must manually download and terminate
     """
     print("\nExample 2: Custom Scene List")
     print("-" * 40)
@@ -111,10 +137,12 @@ def example_2_custom_scene_list():
     ]
     
     # Execute batch processing
-    result = operation.execute_batch_test(
+    result = operation.execute_batch(
         scenes=scenes,                                      # List of scene dictionaries
         language="english",                                 # "chinese" or "english"
-        enable_zoom=True                                    # Enable zoom effects
+        enable_zoom=True,                                   # Enable zoom effects
+        auto_terminate=False                                # Keep instance alive (manual download required)
+                                                           # Set to True for automatic download before termination
     )
     
     # RETURN STRUCTURE - Same as example_1
@@ -124,7 +152,8 @@ def example_2_custom_scene_list():
         print(f"⏱️  Processing time: {result['total_time']:.1f}s")
         print(f"💰 Processing cost: ${result['cost_usd']:.6f}")
         
-        # Download results to local machine
+        # Download results to local machine (only needed if auto_terminate=False)
+        # NOTE: If auto_terminate=True, files are already downloaded and available in result['downloaded_files']
         output_dir = "/path/to/output"
         download_result = operation.download_batch_results(
             batch_results=result['batch_results'],          # Pass the batch_results from above
@@ -152,6 +181,10 @@ def example_3_single_scene_test():
     """
     Example 3: Test a single scene
     Perfect for testing or processing individual files
+    
+    DOWNLOAD BEHAVIOR OPTIONS:
+    1. auto_terminate=True: Process → Download → Terminate (automatic)
+    2. auto_terminate=False: Process → Keep alive (manual download required)
     """
     print("\nExample 3: Single Scene Test")
     print("-" * 40)
@@ -168,10 +201,12 @@ def example_3_single_scene_test():
     }
     
     # Process single scene (pass as list with one item)
-    result = operation.execute_batch_test(
+    result = operation.execute_batch(
         scenes=[scene],                                             # List with single scene
         language="chinese",                                         # Language for subtitle rendering
-        enable_zoom=True                                           # Enable zoom effects
+        enable_zoom=True,                                           # Enable zoom effects
+        auto_terminate=False                                        # Keep instance alive for manual download
+                                                                   # Change to True for automatic download
     )
     
     if result["success"]:
@@ -183,7 +218,8 @@ def example_3_single_scene_test():
             print(f"📊 Scenario detected: {scene_result['scenario']}")
             print(f"💰 Cost: ${result['cost_usd']:.6f}")
             
-            # Download the video locally
+            # Download the video locally (only if auto_terminate=False)
+            # With auto_terminate=True, check result['downloaded_files'] instead
             output_dir = "/Users/lgg/coding/sumatman/runpod/Temps/test_results"
             download_result = operation.download_batch_results(
                 batch_results=result['batch_results'],
@@ -371,15 +407,127 @@ def example_5_production_with_error_handling():
         return critical_error
 
 
+def example_6_parallel_processing():
+    """
+    Example 6: Process 100+ scenes in parallel across multiple instances
+    Perfect for large batch jobs that need to complete quickly
+    """
+    print("\nExample 6: Parallel Batch Processing")
+    print("-" * 40)
+    
+    # Simulate a large scene list (in practice, load from your source)
+    scenes = []
+    for i in range(1, 101):  # 100 scenes
+        scenes.append({
+            "scene_name": f"scene_{i:03d}",
+            "input_image": f"/path/to/images/scene_{i:03d}.png",
+            "input_audio": f"/path/to/audio/scene_{i:03d}.mp3",
+            "subtitle": f"/path/to/subtitles/scene_{i:03d}.srt" if i % 2 == 0 else None
+        })
+    
+    # Process 100 scenes with 10 scenes per instance (10 instances in parallel)
+    result = execute_parallel_batches(
+        scenes=scenes,
+        scenes_per_batch=10,        # 10 scenes per instance
+        language="english",
+        enable_zoom=True,
+        config_priority=1,          # Use fastest instances
+        max_parallel_instances=10,  # Up to 10 instances at once
+        saving_dir="./batch_output" # Optional: specify where to save videos
+    )
+    
+    # RETURN STRUCTURE:
+    # result = {
+    #     "success": True,
+    #     "total_scenes": 100,
+    #     "successful_scenes": 98,
+    #     "failed_scenes": 2,
+    #     "total_cost_usd": 2.153400,      # Total cost across all instances
+    #     "total_time": 2500.5,            # Sum of all instance processing times
+    #     "parallel_time": 265.3,          # Actual wall clock time (10x faster!)
+    #     "time_saved": 2235.2,            # Time saved by parallelism
+    #     "instances_used": 10,
+    #     "scenes_per_batch": 10,
+    #     "batch_results": [...],          # All 100 scene results, sorted by scene_name
+    #     "instance_results": [...],       # Details for each of the 10 instances
+    #     "efficiency": {
+    #         "speedup_factor": 9.42,      # Almost 10x speedup!
+    #         "cost_per_scene": 0.0220,    # Average cost per scene
+    #         "success_rate": 0.98         # 98% success rate
+    #     }
+    # }
+    
+    if result["success"]:
+        print(f"\n📊 PARALLEL PROCESSING RESULTS:")
+        print(f"✅ Completed: {result['successful_scenes']}/{result['total_scenes']} scenes")
+        print(f"💰 Total cost: ${result['total_cost_usd']:.4f}")
+        print(f"⏱️  Time comparison:")
+        print(f"   - Sequential would take: {result['total_time']:.1f}s")
+        print(f"   - Parallel actually took: {result['parallel_time']:.1f}s")
+        print(f"   - Time saved: {result['time_saved']:.1f}s")
+        print(f"🚀 Speedup: {result['efficiency']['speedup_factor']:.2f}x faster!")
+        print(f"💵 Cost per scene: ${result['efficiency']['cost_per_scene']:.4f}")
+        
+        # Example: Process results for your application
+        successful_videos = [
+            scene for scene in result["batch_results"] 
+            if scene.get("success", False)
+        ]
+        
+        # Group by scenario type
+        scenarios = {}
+        for video in successful_videos:
+            scenario = video.get("scenario", "unknown")
+            if scenario not in scenarios:
+                scenarios[scenario] = []
+            scenarios[scenario].append(video["scene_name"])
+        
+        print(f"\n📈 Videos by scenario type:")
+        for scenario, scene_names in scenarios.items():
+            print(f"   {scenario}: {len(scene_names)} videos")
+        
+        # Save batch report
+        report = {
+            "batch_id": f"parallel_batch_{int(time.time())}",
+            "summary": {
+                "total_scenes": result["total_scenes"],
+                "successful": result["successful_scenes"],
+                "failed": result["failed_scenes"],
+                "instances_used": result["instances_used"],
+                "speedup": result["efficiency"]["speedup_factor"],
+                "total_cost_usd": result["total_cost_usd"]
+            },
+            "performance": {
+                "parallel_time_seconds": result["parallel_time"],
+                "sequential_time_estimate": result["total_time"],
+                "time_saved_seconds": result["time_saved"],
+                "efficiency_percentage": (result["time_saved"] / result["total_time"] * 100) if result["total_time"] > 0 else 0
+            },
+            "videos": successful_videos
+        }
+        
+        with open("parallel_batch_report.json", "w") as f:
+            json.dump(report, f, indent=2)
+        
+        print(f"\n📄 Report saved to: parallel_batch_report.json")
+    
+    return result
+
+
 if __name__ == "__main__":
     print("InstantInstanceOperation v2 - Usage Examples")
     print("=" * 50)
+    print("\n⚡ IMPORTANT: Download Behavior")
+    print("   - auto_terminate=True: Automatically downloads files before terminating")
+    print("   - auto_terminate=False: Keeps instance alive; manual download required")
+    print("   - Default: auto_terminate=False (to prevent accidental termination)")
     print("\nAvailable examples:")
     print("1. Simple folder scan - Process all scenes in a folder")
     print("2. Custom scene list - Process specific files")
     print("3. Single scene test - Test with one file")
     print("4. API integration - Get URLs without downloading")
     print("5. Production ready - With error handling and reporting")
+    print("6. Parallel processing - Process 100+ scenes across multiple instances")
     
     # Uncomment the example you want to run:
     
@@ -388,5 +536,6 @@ if __name__ == "__main__":
     example_3_single_scene_test()  # This one works with your test files
     # example_4_api_integration()
     # example_5_production_with_error_handling()
+    # example_6_parallel_processing()  # Process 100 scenes in parallel!
     
     print("\n✅ Example completed!")

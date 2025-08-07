@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Instant Instance Operation v2.0 - Enhanced Core Function
-Rapidly create AWS instance, deploy Docker image, test batch scenes with effects, and cleanup
+Rapidly create AWS instance, deploy Docker image, process batch scenes with effects, and cleanup
 
 Enhanced Features:
 - Batch scene processing
@@ -234,7 +234,7 @@ class InstantInstanceOperationV2:
         """
         scenes = []
         
-        # Look for scene files in standard pattern: scene_XXX_chinese.*
+        # Look for scene files in standard pattern: scene_XXX.*
         images_dir = os.path.join(folder_path, "images")
         audio_dir = os.path.join(folder_path, "audio")
         
@@ -242,7 +242,7 @@ class InstantInstanceOperationV2:
             raise ValueError(f"Missing images/ or audio/ directories in {folder_path}")
         
         # Find image files and match with audio/subtitle
-        image_pattern = os.path.join(images_dir, "scene_*_chinese.png")
+        image_pattern = os.path.join(images_dir, "scene_*.png")
         image_files = sorted(glob.glob(image_pattern))
         
         for image_file in image_files:
@@ -475,7 +475,7 @@ echo "Startup completed at $(date)"
                             'ResourceType': 'instance',
                             'Tags': [
                                 {'Key': 'Name', 'Value': f'instant-video-batch-{int(time.time())}'},
-                                {'Key': 'Purpose', 'Value': 'Instant Batch Video Testing'},
+                                {'Key': 'Purpose', 'Value': 'Instant Batch Video Processing'},
                                 {'Key': 'AutoTerminate', 'Value': 'true'}
                             ]
                         }
@@ -586,11 +586,22 @@ echo "Startup completed at $(date)"
     
     
     def process_single_scene(self, public_ip: str, scene: Dict, language: str = "chinese", 
-                           enable_zoom: bool = True, enable_subtitles: bool = True) -> Optional[Dict]:
+                           enable_zoom: bool = True, enable_subtitles: bool = True,
+                           watermark_path: str = None, is_portrait: bool = False) -> Optional[Dict]:
         """
         Process a single scene with the new unified API endpoint
         
         Args:
+            public_ip: EC2 instance public IP
+            scene: Scene dictionary with input files
+            language: Language setting
+            enable_zoom: Enable zoom effects
+            enable_subtitles: Whether to add subtitles
+            watermark_path: Path to watermark image file (optional)
+            is_portrait: Whether video is in portrait mode
+        
+        Returns:
+            Dict with processing result or None if failed
             public_ip: API server IP
             scene: Scene dictionary with input_image, input_audio, subtitle
             language: Language setting (chinese/english)
@@ -631,7 +642,8 @@ echo "Startup completed at $(date)"
             "language": language,
             "background_box": True,
             "background_opacity": 0.7,
-            "output_filename": f"{scene_name}_{datetime.now().strftime('%H%M%S')}.mp4"
+            "output_filename": f"{scene_name}_{datetime.now().strftime('%H%M%S')}.mp4",
+            "is_portrait": is_portrait
         }
         
         # Add effects if enabled
@@ -642,6 +654,15 @@ echo "Startup completed at $(date)"
         if subtitle_b64:
             request_data["subtitle"] = subtitle_b64  # Changed from subtitle_path
             self.log_timing(f"Scene {scene_name}: Adding subtitle to request (length: {len(subtitle_b64)} chars)")
+            
+        # Add watermark if provided
+        if watermark_path and os.path.exists(watermark_path):
+            try:
+                watermark_b64 = self.encode_file_to_base64(watermark_path)
+                request_data["watermark"] = watermark_b64
+                self.log_timing(f"Scene {scene_name}: Adding watermark to request")
+            except Exception as e:
+                self.log_timing(f"Scene {scene_name}: Failed to encode watermark - {str(e)}")
         
         headers = {"Content-Type": "application/json"}
         
@@ -739,18 +760,40 @@ echo "Startup completed at $(date)"
         except Exception as e:
             self.log_timing(f"Instance termination failed: {str(e)}")
     
-    def execute_batch_test(self, scenes: List[Dict], language: str = "chinese", 
-                          enable_zoom: bool = True) -> Dict:
+    def execute_batch(self, scenes: List[Dict], language: str = "chinese", 
+                          enable_zoom: bool = True, auto_terminate: bool = False,
+                          watermark_path: str = None, is_portrait: bool = False,
+                          saving_dir: str = None) -> Dict:
         """
-        Main function: Execute batch scene testing
+        Main function: Execute batch scene processing
+        
+        ⚠️ IMPORTANT DOWNLOAD BEHAVIOR:
+        - auto_terminate=True: Videos are processed → Files downloaded automatically → Instance terminated
+        - auto_terminate=False: Videos are processed → Instance kept alive → You must call download_batch_results()
         
         Args:
-            scenes: List of scene dictionaries
+            scenes: List of scene dictionaries with 'scene_name', 'input_image', 'input_audio', 'subtitle' (optional)
             language: Language setting (chinese/english)
             enable_zoom: Enable zoom effects for all scenes
+            auto_terminate: Whether to auto-download and terminate after processing (default: False)
+                          True = Process → Download → Terminate (automatic)
+                          False = Process → Keep alive (manual download required)
+            watermark_path: Path to watermark image file (optional)
+            is_portrait: Whether video is in portrait mode (default: False)
+            saving_dir: Directory to save downloaded files (optional). Priority:
+                       1. User-provided saving_dir
+                       2. RESULTS_DIR from environment/.env
+                       3. Default: ./cloudburst_results/
             
         Returns:
-            Dict with batch test results and performance metrics
+            Dict with batch processing results:
+            - success: bool
+            - successful_scenes: int
+            - cost_usd: float (processing cost)
+            - final_cost_usd: float (total cost including download, only if auto_terminate=True)
+            - batch_results: list of scene results
+            - downloaded_files: list of paths (only if auto_terminate=True)
+            - output_directory: str (only if auto_terminate=True)
         """
         self.start_time = time.time()
         self.timing_log = []
@@ -760,6 +803,7 @@ echo "Startup completed at $(date)"
         self.log_timing(f"=== BATCH INSTANT OPERATION START ({total_scenes} scenes) ===")
         
         instance_id = None
+        result_dict = {}  # Initialize result dictionary for finally block
         try:
             # Phase 1: Create instance
             instance_id = self.create_instance()
@@ -772,6 +816,14 @@ echo "Startup completed at $(date)"
             if not api_ready:
                 raise Exception("API failed to become ready")
             
+            # Notify about download behavior
+            print("")  # Add blank line for clarity
+            if auto_terminate:
+                self.log_timing("📥 AUTO-DOWNLOAD ENABLED: Files will be downloaded automatically before termination")
+            else:
+                self.log_timing("📥 MANUAL DOWNLOAD MODE: Instance will stay alive - use download_batch_results() to download")
+            print("")  # Add blank line for clarity
+            
             # Phase 4: Process all scenes sequentially
             success_count = 0
             total_processing_time = 0
@@ -780,7 +832,9 @@ echo "Startup completed at $(date)"
             for i, scene in enumerate(scenes, 1):
                 self.log_timing(f"=== Processing Scene {i}/{total_scenes} ===")
                 
-                result = self.process_single_scene(public_ip, scene, language, enable_zoom, enable_subtitles=True)
+                result = self.process_single_scene(public_ip, scene, language, enable_zoom, 
+                                                 enable_subtitles=True, watermark_path=watermark_path, 
+                                                 is_portrait=is_portrait)
                 
                 if result:
                     self.batch_results.append(result)
@@ -801,7 +855,7 @@ echo "Startup completed at $(date)"
                     })
             
             total_time = time.time() - self.start_time
-            self.log_timing(f"=== BATCH TEST COMPLETED: {success_count}/{total_scenes} scenes successful in {total_time:.2f}s ===")
+            self.log_timing(f"=== BATCH PROCESSING COMPLETED: {success_count}/{total_scenes} scenes successful in {total_time:.2f}s ===")
             
             # Calculate cost based on current runtime (downloads will add more time)
             current_runtime = time.time() - self.instance_start_time if self.instance_start_time else total_time
@@ -812,7 +866,7 @@ echo "Startup completed at $(date)"
             self.log_timing("⚠️  Keeping instance alive for batch downloads...")
             self._instance_kept_alive = True  # Set instance flag to prevent auto-termination
             
-            return {
+            result_dict = {
                 "success": success_count > 0,
                 "total_scenes": total_scenes,
                 "successful_scenes": success_count,
@@ -826,14 +880,16 @@ echo "Startup completed at $(date)"
                 "timing_log": self.timing_log.copy(),
                 "cost_usd": cost_info["total_cost_usd"],  # 🆕 Simple float for database storage
                 "cost_info": cost_info,  # Detailed cost breakdown for display
+                "config_used": self.current_config,  # Instance configuration used
                 "_instance_kept_alive": True  # Flag to indicate instance is still running
             }
+            return result_dict
             
         except Exception as e:
             total_time = time.time() - self.start_time if self.start_time else 0
-            self.log_timing(f"=== BATCH TEST FAILED: {str(e)} ===")
+            self.log_timing(f"=== BATCH PROCESSING FAILED: {str(e)} ===")
             
-            return {
+            result_dict = {
                 "success": False,
                 "error": str(e),
                 "total_scenes": total_scenes,
@@ -841,19 +897,54 @@ echo "Startup completed at $(date)"
                 "instance_id": instance_id,
                 "total_time": total_time,
                 "batch_results": self.batch_results,
-                "timing_log": self.timing_log.copy()
+                "timing_log": self.timing_log.copy(),
+                "config_used": self.current_config if hasattr(self, 'current_config') else None
             }
+            return result_dict
             
         finally:
-            # 🚨 CRITICAL FIX: Only terminate instance on FAILURE, not success
-            # Success case: instance stays alive for downloads
-            if instance_id and not (hasattr(self, '_instance_kept_alive') and self._instance_kept_alive):
-                self.log_timing("Terminating instance due to failure or error")
-                self.terminate_instance(instance_id)
-            elif instance_id:
-                self.log_timing("Instance kept alive for downloads - manual termination required")
+            # Handle instance termination based on auto_terminate parameter
+            if instance_id:
+                if auto_terminate:
+                    # Download files before terminating
+                    # Check if we have any successful results (success_count may not be defined if early error)
+                    successful_results = [r for r in self.batch_results if r.get("success")]
+                    if successful_results:
+                        self.log_timing("Auto-downloading results before termination...")
+                        
+                        # Use 3-tier priority for output directory
+                        if saving_dir:
+                            # Priority 1: User-provided directory
+                            base_dir = saving_dir
+                        elif os.getenv('RESULTS_DIR'):
+                            # Priority 2: RESULTS_DIR from environment
+                            base_dir = os.getenv('RESULTS_DIR')
+                        else:
+                            # Priority 3: Default fallback
+                            base_dir = os.path.join(os.getcwd(), "cloudburst_results")
+                        
+                        output_dir = os.path.join(base_dir, f"batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+                        download_result = self.download_batch_results(self.batch_results, output_dir, instance_id, terminate_after=True)
+                        
+                        # Update the return result with download info
+                        result_dict["downloaded_files"] = download_result.get("downloaded_files", [])
+                        result_dict["download_count"] = download_result.get("download_count", 0)
+                        result_dict["final_cost_usd"] = download_result.get("final_cost_usd", result_dict.get("cost_usd", 0.0))
+                        result_dict["output_directory"] = output_dir
+                        
+                        self.log_timing(f"Downloaded {download_result['download_count']} files to: {output_dir}")
+                    else:
+                        # No successful results, just terminate
+                        self.log_timing("No successful results to download, terminating instance")
+                        self.terminate_instance(instance_id)
+                elif not (hasattr(self, '_instance_kept_alive') and self._instance_kept_alive):
+                    # Only terminate on failure when auto_terminate is False
+                    self.log_timing("Terminating instance due to failure or error")
+                    self.terminate_instance(instance_id)
+                else:
+                    self.log_timing("Instance kept alive for downloads - manual termination required")
     
-    def download_batch_results(self, batch_results: List[Dict], output_dir: str, instance_id: str = None) -> Dict:
+    def download_batch_results(self, batch_results: List[Dict], output_dir: str, instance_id: str = None, terminate_after: bool = True) -> Dict:
         """Download all successful batch results to local directory and clean up instance"""
         downloaded_files = []
         os.makedirs(output_dir, exist_ok=True)
@@ -903,12 +994,16 @@ echo "Startup completed at $(date)"
                 final_cost_usd = final_cost_info['total_cost_usd']
                 self.log_timing(f"FINAL COST: ${final_cost_usd:.6f} (total runtime: {final_cost_info['runtime_minutes']:.2f}min)")
             
-            if downloaded_count > 0:
-                self.log_timing(f"All downloads completed ({downloaded_count}/{total_successful}), terminating instance...")
-                self.terminate_instance(instance_id)
+            # Only terminate if requested
+            if terminate_after:
+                if downloaded_count > 0:
+                    self.log_timing(f"All downloads completed ({downloaded_count}/{total_successful}), terminating instance...")
+                    self.terminate_instance(instance_id)
+                else:
+                    self.log_timing("No downloads successful, but terminating instance anyway...")
+                    self.terminate_instance(instance_id)
             else:
-                self.log_timing("No downloads successful, but terminating instance anyway...")
-                self.terminate_instance(instance_id)
+                self.log_timing(f"Downloads completed ({downloaded_count}/{total_successful}), instance kept alive")
         
         return {
             "downloaded_files": downloaded_files,
@@ -921,18 +1016,23 @@ echo "Startup completed at $(date)"
 
 # Convenience functions for direct use
 def scan_and_test_folder(folder_path: str, language: str = "chinese", 
-                        enable_zoom: bool = True, config_priority: int = 1) -> Dict:
+                        enable_zoom: bool = True, config_priority: int = 1,
+                        saving_dir: str = None) -> Dict:
     """
-    Convenience function to scan folder and run batch test
+    Convenience function to scan folder and run batch processing
     
     Args:
         folder_path: Path to folder with images/ and audio/ subdirectories
         language: Language setting (chinese/english)  
         enable_zoom: Enable zoom effects
         config_priority: Instance configuration priority (1-3)
+        saving_dir: Directory to save downloaded files (optional). Priority:
+                   1. User-provided saving_dir
+                   2. RESULTS_DIR from environment/.env
+                   3. Default: ./cloudburst_results/
         
     Returns:
-        Batch test results dictionary
+        Batch processing results dictionary
     """
     operation = InstantInstanceOperationV2(config_priority=config_priority)
     
@@ -947,26 +1047,485 @@ def scan_and_test_folder(folder_path: str, language: str = "chinese",
             "config_used": operation.current_config
         }
     
-    # Execute batch test
-    result = operation.execute_batch_test(scenes, language, enable_zoom)
+    # Execute batch processing (keep instance alive for potential downloads)
+    result = operation.execute_batch(scenes, language, enable_zoom, auto_terminate=False, 
+                                   watermark_path=None, is_portrait=False, saving_dir=saving_dir)
     result["config_used"] = operation.current_config
     return result
 
-def instant_batch_test(scenes: List[Dict], language: str = "chinese", 
-                      enable_zoom: bool = True, config_priority: int = 1) -> Dict:
+def instant_batch_processing(scenes: List[Dict], language: str = "chinese", 
+                      enable_zoom: bool = True, config_priority: int = 1,
+                      saving_dir: str = None) -> Dict:
     """
-    Convenience function for instant batch video testing
+    Convenience function for instant batch video processing
     
     Args:
         scenes: List of scene dictionaries
         language: Language setting
         enable_zoom: Enable zoom effects
         config_priority: Instance configuration priority (1-3)
+        saving_dir: Directory to save downloaded files (optional). Priority:
+                   1. User-provided saving_dir
+                   2. RESULTS_DIR from environment/.env
+                   3. Default: ./cloudburst_results/
         
     Returns:
-        Batch test results
+        Batch processing results
     """
     operation = InstantInstanceOperationV2(config_priority=config_priority)
-    result = operation.execute_batch_test(scenes, language, enable_zoom)
+    result = operation.execute_batch(scenes, language, enable_zoom, auto_terminate=False, 
+                                   watermark_path=None, is_portrait=False, saving_dir=saving_dir)
     result["config_used"] = operation.current_config
     return result
+
+
+def calculate_optimal_batch_distribution(total_scenes: int, 
+                                       scenes_per_batch: int = 10,
+                                       max_parallel_instances: int = 10,
+                                       min_scenes_per_batch: int = 5) -> Dict:
+    """
+    Calculate optimal distribution of scenes across instances
+    
+    Args:
+        total_scenes: Total number of scenes to process
+        scenes_per_batch: User's preferred scenes per batch
+        max_parallel_instances: Maximum instances to run in parallel
+        min_scenes_per_batch: Minimum scenes to justify instance startup cost
+        
+    Returns:
+        Dict with distribution plan:
+        {
+            "num_instances": int,  # Actual instances to use
+            "batch_distribution": List[int],  # Number of scenes per batch
+            "total_batches": int,  # Same as num_instances
+            "strategy": str,  # Description of strategy used
+            "warnings": List[str],  # Any warnings about parameter adjustments
+        }
+    """
+    warnings = []
+    
+    # Case 1: Total scenes exceeds or equals what we can handle with preferred batch size
+    if total_scenes >= scenes_per_batch * max_parallel_instances:
+        # Use all available instances and distribute evenly
+        num_instances = max_parallel_instances
+        base_scenes = total_scenes // num_instances
+        remainder = total_scenes % num_instances
+        
+        # Create distribution: first 'remainder' instances get +1 scene
+        batch_distribution = []
+        for i in range(num_instances):
+            batch_distribution.append(base_scenes + (1 if i < remainder else 0))
+        
+        strategy = f"Large batch: Using all {num_instances} instances with ~{base_scenes} scenes each"
+        warnings.append(f"Overriding scenes_per_batch ({scenes_per_batch}) to handle {total_scenes} scenes")
+        
+        return {
+            "num_instances": num_instances,
+            "batch_distribution": batch_distribution,
+            "total_batches": num_instances,
+            "strategy": strategy,
+            "warnings": warnings
+        }
+    
+    # Case 2: Total scenes can be handled with preferred batch size
+    # Start with even distribution across max instances
+    num_instances = max_parallel_instances
+    
+    # Keep reducing instances until each has >= min_scenes_per_batch
+    while num_instances > 1:
+        base_scenes = total_scenes // num_instances
+        remainder = total_scenes % num_instances
+        
+        min_batch_size = base_scenes
+        
+        if min_batch_size >= min_scenes_per_batch:
+            # This distribution works!
+            batch_distribution = []
+            for i in range(num_instances):
+                batch_distribution.append(base_scenes + (1 if i < remainder else 0))
+            
+            # Check if we're close to user's preferred scenes_per_batch
+            avg_scenes = total_scenes / num_instances
+            if abs(avg_scenes - scenes_per_batch) <= 2:
+                strategy = f"Optimal: {num_instances} instances with ~{int(avg_scenes)} scenes each"
+            else:
+                strategy = f"Adjusted: {num_instances} instances to maintain minimum {min_scenes_per_batch} scenes per batch"
+                if avg_scenes > scenes_per_batch:
+                    warnings.append(f"Using fewer instances to ensure each has >= {min_scenes_per_batch} scenes")
+            
+            return {
+                "num_instances": num_instances,
+                "batch_distribution": batch_distribution,
+                "total_batches": num_instances,
+                "strategy": strategy,
+                "warnings": warnings
+            }
+        
+        # Reduce instances and try again
+        num_instances -= 1
+    
+    # If we get here, use single instance
+    return {
+        "num_instances": 1,
+        "batch_distribution": [total_scenes],
+        "total_batches": 1,
+        "strategy": f"Single instance: {total_scenes} scenes too small to parallelize efficiently",
+        "warnings": [f"Using single instance as {total_scenes} scenes < {min_scenes_per_batch * 2}"]
+    }
+
+
+def execute_parallel_batches(scenes: List[Dict], 
+                           scenes_per_batch: int = 10,
+                           language: str = "chinese",
+                           enable_zoom: bool = True,
+                           config_priority: int = 1,
+                           max_parallel_instances: int = 10,
+                           min_scenes_per_batch: int = 5,
+                           watermark_path: str = None,
+                           is_portrait: bool = False,
+                           saving_dir: str = None) -> Dict:
+    """
+    Execute large scene lists in parallel across multiple instances
+    
+    This function splits a large list of scenes into smaller batches and processes
+    them simultaneously on separate AWS instances for maximum speed.
+    
+    Smart Distribution Logic:
+    - If total scenes <= scenes_per_batch * max_parallel_instances:
+      Uses requested scenes_per_batch (may use fewer instances)
+    - If total scenes > scenes_per_batch * max_parallel_instances:
+      Redistributes evenly across exactly max_parallel_instances
+      
+    Examples:
+    - 50 scenes, scenes_per_batch=10, max_instances=10 → 5 instances × 10 scenes
+    - 120 scenes, scenes_per_batch=10, max_instances=10 → 10 instances × 12 scenes
+    - 101 scenes, scenes_per_batch=10, max_instances=10 → 10 instances (9×10 + 1×11)
+    
+    Args:
+        scenes: List of all scene dictionaries to process
+        scenes_per_batch: Preferred number of scenes per instance (default: 10)
+        language: Language setting (chinese/english)
+        enable_zoom: Enable zoom effects for all scenes
+        config_priority: Instance configuration priority (1-3)
+        max_parallel_instances: Maximum number of instances to run in parallel
+        min_scenes_per_batch: Minimum scenes per instance to justify startup cost (default: 5)
+        watermark_path: Optional path to watermark image
+        is_portrait: Whether video is in portrait mode
+        saving_dir: Directory to save downloaded files (default: ./cloudburst_results/)
+        
+    Returns:
+        Dict with aggregated results from all batches, ordered by scene name:
+        {
+            "success": bool,
+            "total_scenes": int,
+            "successful_scenes": int,
+            "failed_scenes": int,
+            "total_cost_usd": float,
+            "total_time": float,
+            "parallel_time": float,  # Wall clock time (faster due to parallelism)
+            "instances_used": int,
+            "batch_results": [...],  # All scene results ordered by scene_name
+            "instance_results": [...]  # Details per instance for debugging
+        }
+    """
+    import concurrent.futures
+    import threading
+    
+    start_time = time.time()
+    total_scenes = len(scenes)
+    
+    # Calculate optimal batch distribution
+    distribution_plan = calculate_optimal_batch_distribution(
+        total_scenes=total_scenes,
+        scenes_per_batch=scenes_per_batch,
+        max_parallel_instances=max_parallel_instances,
+        min_scenes_per_batch=min_scenes_per_batch
+    )
+    
+    # Extract values from distribution plan
+    num_instances = distribution_plan["num_instances"]
+    batch_distribution = distribution_plan["batch_distribution"]
+    
+    print(f"🚀 Starting parallel batch processing")
+    print(f"📊 Total scenes: {total_scenes}")
+    print(f"🖥️  Instances to use: {num_instances}")
+    print(f"📋 Strategy: {distribution_plan['strategy']}")
+    
+    # Print any warnings
+    for warning in distribution_plan.get("warnings", []):
+        print(f"⚠️  {warning}")
+    
+    # Split scenes into batches based on distribution plan
+    scene_batches = []
+    current_index = 0
+    
+    for batch_id, batch_size in enumerate(batch_distribution, 1):
+        batch = scenes[current_index:current_index + batch_size]
+        scene_batches.append({
+            "batch_id": batch_id,
+            "scenes": batch,
+            "start_index": current_index,
+            "end_index": current_index + len(batch) - 1
+        })
+        current_index += batch_size
+    
+    print(f"📊 Batch distribution: {batch_distribution}")
+    
+    # Thread-safe result storage
+    results_lock = threading.Lock()
+    instance_results = []
+    active_instances = []  # Track all instance IDs for cleanup
+    
+    def process_batch(batch_info: Dict) -> Dict:
+        """Process a single batch on its own instance"""
+        batch_id = batch_info["batch_id"]
+        batch_scenes = batch_info["scenes"]
+        
+        print(f"\n🔄 Batch {batch_id}: Processing {len(batch_scenes)} scenes")
+        
+        try:
+            # Create instance for this batch
+            operation = InstantInstanceOperationV2(config_priority=config_priority)
+            
+            # Execute batch (keep instance alive for downloads)
+            result = operation.execute_batch(
+                scenes=batch_scenes,
+                language=language,
+                enable_zoom=enable_zoom,
+                auto_terminate=False,  # Keep alive for downloads
+                watermark_path=watermark_path,
+                is_portrait=is_portrait
+            )
+            
+            # Track instance ID for cleanup
+            if result.get("instance_id"):
+                with results_lock:
+                    active_instances.append({
+                        "batch_id": batch_id,
+                        "instance_id": result["instance_id"],
+                        "operation": operation
+                    })
+            
+            # Add batch metadata
+            result["batch_id"] = batch_id
+            result["start_index"] = batch_info["start_index"]
+            result["end_index"] = batch_info["end_index"]
+            result["instance_type"] = operation.current_config["instance_type"]
+            
+            # Download results before terminating instance
+            if result.get("success") and result.get("batch_results"):
+                print(f"📥 Batch {batch_id}: Downloading {len(result['batch_results'])} videos...")
+                
+                # Create directory for this batch with priority:
+                # 1. User-provided saving_dir
+                # 2. RESULTS_DIR from environment/.env
+                # 3. Default: ./cloudburst_results/
+                if saving_dir:
+                    # Priority 1: Use user-provided directory
+                    base_dir = saving_dir
+                elif os.getenv('RESULTS_DIR'):
+                    # Priority 2: Use RESULTS_DIR from environment
+                    base_dir = os.getenv('RESULTS_DIR')
+                else:
+                    # Priority 3: Default fallback
+                    base_dir = os.path.join(os.getcwd(), "cloudburst_results")
+                
+                batch_dir = os.path.join(base_dir, f"batch_{batch_id}_{int(time.time())}")
+                os.makedirs(batch_dir, exist_ok=True)
+                
+                # Download all results (this also terminates the instance)
+                download_result = operation.download_batch_results(
+                    batch_results=result['batch_results'],
+                    output_dir=batch_dir,
+                    instance_id=result.get('instance_id')
+                )
+                
+                # Update result with download info
+                result["downloaded_files"] = download_result.get("downloaded_files", [])
+                result["download_dir"] = batch_dir
+                result["final_cost_usd"] = download_result.get("final_cost_usd", result["cost_usd"])
+                
+                print(f"✅ Batch {batch_id}: Downloaded {len(result['downloaded_files'])} files to {batch_dir}")
+            else:
+                # CRITICAL: If batch failed or has no results, we must still terminate the instance
+                print(f"⚠️ Batch {batch_id}: Failed or no results - terminating instance immediately")
+                if result.get('instance_id'):
+                    try:
+                        operation.terminate_instance(result['instance_id'])
+                        print(f"✅ Batch {batch_id}: Instance terminated successfully")
+                    except Exception as term_error:
+                        print(f"❌ Batch {batch_id}: Failed to terminate instance: {str(term_error)}")
+                        # Instance will be caught by the finally block emergency cleanup
+            
+            with results_lock:
+                instance_results.append(result)
+            
+            print(f"✅ Batch {batch_id}: Completed {result.get('successful_scenes', 0)}/{len(batch_scenes)} scenes")
+            print(f"💰 Batch {batch_id}: Cost ${result.get('final_cost_usd', result.get('cost_usd', 0)):.4f}")
+            
+            return result
+            
+        except Exception as e:
+            print(f"❌ Batch {batch_id}: Failed - {str(e)}")
+            
+            error_result = {
+                "batch_id": batch_id,
+                "success": False,
+                "error": str(e),
+                "start_index": batch_info["start_index"],
+                "end_index": batch_info["end_index"],
+                "cost_usd": 0,
+                "successful_scenes": 0,
+                "failed_scenes": len(batch_scenes),
+                "batch_results": []
+            }
+            
+            with results_lock:
+                instance_results.append(error_result)
+                
+            return error_result
+    
+    # Track cleanup status
+    cleanup_performed = False
+    
+    try:
+        # Process batches in parallel
+        with concurrent.futures.ThreadPoolExecutor(max_workers=num_instances) as executor:
+            future_to_batch = {
+                executor.submit(process_batch, batch): batch 
+                for batch in scene_batches
+            }
+            
+            # Wait for all batches to complete
+            concurrent.futures.wait(future_to_batch)
+        
+        # Aggregate results
+        all_scene_results = []
+        all_downloaded_files = []
+        total_cost = 0
+        total_processing_time = 0
+        successful_scenes = 0
+        failed_scenes = 0
+    
+        # Sort instance results by batch_id to maintain order
+        instance_results.sort(key=lambda x: x.get("batch_id", 0))
+    
+        for instance_result in instance_results:
+            if instance_result.get("success", False):
+                # Use final_cost_usd if available (includes download time)
+                total_cost += instance_result.get("final_cost_usd", instance_result.get("cost_usd", 0))
+                total_processing_time += instance_result.get("total_time", 0)
+                successful_scenes += instance_result.get("successful_scenes", 0)
+                failed_scenes += instance_result.get("failed_scenes", 0)
+                
+                # Collect all scene results
+                for scene_result in instance_result.get("batch_results", []):
+                    all_scene_results.append(scene_result)
+                
+                # Collect downloaded files
+                for file_path in instance_result.get("downloaded_files", []):
+                    all_downloaded_files.append({
+                        "batch_id": instance_result.get("batch_id"),
+                        "file_path": file_path,
+                        "temp_dir": instance_result.get("download_dir")
+                    })
+            else:
+                # Even failed batches count their scenes as failed
+                failed_scenes += instance_result.get("failed_scenes", 0)
+    
+        # Sort all scene results by scene name
+        all_scene_results.sort(key=lambda x: x.get("scene_name", ""))
+    
+        parallel_time = time.time() - start_time
+    
+        # Prepare final aggregated result
+        final_result = {
+        "success": successful_scenes > 0,  # At least some scenes succeeded
+        "total_scenes": total_scenes,
+        "successful_scenes": successful_scenes,
+        "failed_scenes": failed_scenes,
+        "total_cost_usd": round(total_cost, 6),
+        "total_time": total_processing_time,  # Sum of all instance times
+        "parallel_time": parallel_time,  # Actual wall clock time
+        "time_saved": total_processing_time - parallel_time if num_instances > 1 else 0,
+        "instances_used": num_instances,
+        "scenes_per_batch": scenes_per_batch,
+        "batch_results": all_scene_results,  # All scenes sorted by name
+        "downloaded_files": all_downloaded_files,  # All downloaded file paths
+        "instance_results": instance_results,  # Per-instance details
+        "efficiency": {
+            "speedup_factor": total_processing_time / parallel_time if parallel_time > 0 else 1,
+            "cost_per_scene": total_cost / successful_scenes if successful_scenes > 0 else 0,
+            "success_rate": successful_scenes / total_scenes if total_scenes > 0 else 0
+        }
+        }
+        
+        # Print summary
+        print(f"\n{'='*60}")
+        print(f"🎬 PARALLEL BATCH PROCESSING COMPLETE")
+        print(f"{'='*60}")
+        print(f"✅ Successful scenes: {successful_scenes}/{total_scenes}")
+        print(f"❌ Failed scenes: {failed_scenes}")
+        print(f"💰 Total cost: ${total_cost:.4f}")
+        print(f"⏱️  Parallel time: {parallel_time:.1f}s (saved {final_result['time_saved']:.1f}s)")
+        print(f"🚀 Speedup: {final_result['efficiency']['speedup_factor']:.2f}x faster")
+        print(f"📥 Downloaded files: {len(all_downloaded_files)} videos")
+        if all_downloaded_files:
+            # Get unique directories where files were saved
+            unique_dirs = set()
+            for file_info in all_downloaded_files:
+                temp_dir = file_info.get('temp_dir')
+                if temp_dir:
+                    unique_dirs.add(temp_dir)
+            
+            if len(unique_dirs) == 1:
+                # All files in same base directory
+                print(f"📁 Files saved in: {list(unique_dirs)[0]}")
+            else:
+                # Files in multiple directories
+                print(f"📁 Files saved in {len(unique_dirs)} directories:")
+                for dir_path in sorted(unique_dirs):
+                    batch_count = sum(1 for f in all_downloaded_files if f.get('temp_dir') == dir_path)
+                    print(f"   - {dir_path} ({batch_count} files)")
+        
+        # Log detailed download results if files exist
+        if all_downloaded_files and len(all_downloaded_files) <= 10:  # Only show details for small batches
+            print(f"\n📥 Downloaded files:")
+            for file_info in all_downloaded_files:
+                file_path = file_info.get('file_path', '')
+                batch_id = file_info.get('batch_id', 'unknown')
+                if os.path.exists(file_path):
+                    size_mb = os.path.getsize(file_path) / (1024 * 1024)
+                    print(f"   🎬 Batch {batch_id}: {os.path.basename(file_path)} ({size_mb:.1f} MB)")
+        
+        print(f"{'='*60}")
+        
+        cleanup_performed = True
+        return final_result
+        
+    finally:
+        # CRITICAL: Emergency cleanup - terminate any instances that might still be running
+        if not cleanup_performed and active_instances:
+            print(f"\n⚠️  EMERGENCY CLEANUP: Terminating {len(active_instances)} instances...")
+            
+            for instance_info in active_instances:
+                try:
+                    instance_id = instance_info["instance_id"]
+                    batch_id = instance_info["batch_id"]
+                    operation = instance_info["operation"]
+                    
+                    print(f"🛑 Terminating instance for batch {batch_id} (ID: {instance_id})")
+                    operation.terminate_instance(instance_id)
+                    
+                except Exception as e:
+                    print(f"❌ Failed to terminate instance {instance_id}: {str(e)}")
+                    # Try direct EC2 termination as last resort
+                    try:
+                        import boto3
+                        ec2 = boto3.client('ec2', region_name=os.environ.get('AWS_REGION', 'us-east-1'))
+                        ec2.terminate_instances(InstanceIds=[instance_id])
+                        print(f"✅ Terminated via direct EC2 API call")
+                    except:
+                        print(f"🚨 CRITICAL: Could not terminate instance {instance_id} - manual cleanup required!")
+            
+            print(f"⚠️  Emergency cleanup completed\n")
