@@ -156,6 +156,10 @@ AWS_KEY_PAIR_NAME=your-keypair-name
 AWS_SECURITY_GROUP_ID=sg-xxxxxxxxx
 AWS_SUBNET_ID=subnet-xxxxxxxxx
 
+# AWS Credentials (Required)
+AWS_ACCESS_KEY_ID=your-aws-access-key-id
+AWS_SECRET_ACCESS_KEY=your-aws-secret-access-key
+
 # Optional: specific AMI or instance type
 AWS_INSTANCE_TYPE=c5.2xlarge
 DOCKER_IMAGE=betashow/video-generation-api:latest

@@ -156,6 +156,10 @@ AWS_KEY_PAIR_NAME=your-keypair-name
 AWS_SECURITY_GROUP_ID=sg-xxxxxxxxx
 AWS_SUBNET_ID=subnet-xxxxxxxxx
 
+# AWS 凭证（必需）
+AWS_ACCESS_KEY_ID=your-aws-access-key-id
+AWS_SECRET_ACCESS_KEY=your-aws-secret-access-key
+
 # 可选：指定 AMI 或实例类型
 AWS_INSTANCE_TYPE=c5.2xlarge
 DOCKER_IMAGE=betashow/video-generation-api:latest

@@ -101,6 +101,10 @@ class InstantInstanceOperationV2:
         # Results directory
         self.results_dir = os.getenv('RESULTS_DIR', '/tmp/instant_test_results')
         
+        # Create results directory if it doesn't exist
+        os.makedirs(self.results_dir, exist_ok=True)
+        print(f"📁 Using results directory: {self.results_dir}")
+        
         # Validate required configuration
         self._validate_configuration()
         
@@ -687,7 +691,11 @@ echo "Startup completed at $(date)"
         self.log_timing(f"Scene {scene_name}: Request language: {request_data.get('language')}")
         
         # Debug: Save request data for inspection
-        debug_file = f"/Users/lgg/coding/sumatman/Temps/debug_request_{scene_name}.json"
+        # Use same priority as results: 1) saving_dir 2) RESULTS_DIR 3) default
+        debug_base_dir = self.results_dir  # This already follows the 3-tier priority
+        debug_dir = os.path.join(debug_base_dir, "debug_logs")
+        os.makedirs(debug_dir, exist_ok=True)
+        debug_file = os.path.join(debug_dir, f"debug_request_{scene_name}.json")
         with open(debug_file, 'w') as f:
             debug_data = request_data.copy()
             debug_data['input_image'] = f"[BASE64: {len(request_data['input_image'])} chars]"
