@@ -611,6 +611,31 @@ Subtitle: scene_024_chinese.srt
 
 This example shows the "full_featured" scenario with both subtitles and zoom effects, which takes the longest to process but produces the highest quality output.
 
+## 🚨 AWS Account Suspension/Quota Limits
+
+If using CloudBurst leads to AWS account suspension or quota limitations, here's what to do:
+
+### Common Triggers:
+- Frequent instance creation and termination (CloudBurst's core functionality)
+- AWS security algorithms may flag this as suspicious activity
+- Potential API key exposure concerns
+
+### Resolution Guide:
+For a detailed walkthrough of how to resolve AWS account limitations and communicate with AWS Support effectively, see:
+- 📖 **[How We Turned an AWS Security Scare into a Learning Opportunity](https://sumatman.ai/how-we-turned-an-aws-security-scare-into-a-learning-opportunity/)**
+
+This guide covers:
+- What triggers AWS security alerts
+- How to communicate with AWS Support
+- Best practices to prevent future issues
+- Our 6-hour resolution experience
+
+### Prevention Tips:
+- Use AWS IAM roles with minimal required permissions
+- Monitor your CloudBurst usage patterns
+- Consider implementing rate limiting between batch runs
+- Keep your AWS credentials secure and rotate them regularly
+
 ## 🤝 Contributing
 
 This is my second open source project! Feel free to:
