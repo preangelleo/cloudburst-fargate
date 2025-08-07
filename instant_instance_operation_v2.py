@@ -836,6 +836,15 @@ echo "Startup completed at $(date)"
             success_count = 0
             total_processing_time = 0
             total_file_size = 0
+            downloaded_files = []
+            
+            # Prepare download directory based on saving_dir priority
+            if saving_dir:
+                download_dir = os.path.join(saving_dir, f"batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+            else:
+                download_dir = os.path.join(self.results_dir, f"batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+            os.makedirs(download_dir, exist_ok=True)
+            self.log_timing(f"📥 Downloads will be saved to: {download_dir}")
             
             for i, scene in enumerate(scenes, 1):
                 self.log_timing(f"=== Processing Scene {i}/{total_scenes} ===")
@@ -851,6 +860,31 @@ echo "Startup completed at $(date)"
                         success_count += 1
                         total_processing_time += result["processing_time"]
                         total_file_size += result.get("file_size", 0)
+                        
+                        # IMMEDIATE DOWNLOAD: Download the video right after generation
+                        try:
+                            scene_name = result["scene_name"]
+                            download_url = result["download_url"]
+                            
+                            self.log_timing(f"📥 Downloading {scene_name} immediately...")
+                            response = requests.get(download_url, timeout=120)
+                            
+                            if response.status_code == 200:
+                                filename = f"{scene_name}.mp4"
+                                output_path = os.path.join(download_dir, filename)
+                                
+                                with open(output_path, 'wb') as f:
+                                    f.write(response.content)
+                                
+                                file_size = len(response.content)
+                                self.log_timing(f"✅ Downloaded {scene_name}: {file_size/1024/1024:.2f}MB → {output_path}")
+                                downloaded_files.append(output_path)
+                                result["local_path"] = output_path  # Add local path to result
+                            else:
+                                self.log_timing(f"⚠️ Download failed for {scene_name}: HTTP {response.status_code}")
+                                
+                        except Exception as e:
+                            self.log_timing(f"⚠️ Download error for {scene_name}: {str(e)}")
                     
                     # Brief pause between scenes to avoid overwhelming API
                     if i < total_scenes:
@@ -870,8 +904,14 @@ echo "Startup completed at $(date)"
             cost_info = self.calculate_cost(current_runtime)
             self.log_timing(f"Current estimated cost: ${cost_info['total_cost_usd']:.6f} (runtime: {cost_info['runtime_minutes']:.2f}min)")
             
-            # 🚨 CRITICAL: Do NOT terminate instance yet - downloads happen outside this function
-            self.log_timing("⚠️  Keeping instance alive for batch downloads...")
+            # Show download summary
+            if downloaded_files:
+                self.log_timing(f"✅ Downloaded {len(downloaded_files)} videos to: {download_dir}")
+            else:
+                self.log_timing("⚠️ No videos were downloaded (check for errors above)")
+            
+            # 🚨 CRITICAL: Do NOT terminate instance yet - might need for retry downloads
+            self.log_timing("⚠️  Keeping instance alive for potential retry downloads...")
             self._instance_kept_alive = True  # Set instance flag to prevent auto-termination
             
             result_dict = {
@@ -889,7 +929,10 @@ echo "Startup completed at $(date)"
                 "cost_usd": cost_info["total_cost_usd"],  # 🆕 Simple float for database storage
                 "cost_info": cost_info,  # Detailed cost breakdown for display
                 "config_used": self.current_config,  # Instance configuration used
-                "_instance_kept_alive": True  # Flag to indicate instance is still running
+                "_instance_kept_alive": True,  # Flag to indicate instance is still running
+                "downloaded_files": downloaded_files,  # List of downloaded file paths
+                "download_dir": download_dir,  # Directory where files were saved
+                "download_count": len(downloaded_files)  # Number of files downloaded
             }
             return result_dict
             
@@ -1302,7 +1345,8 @@ def execute_parallel_batches(scenes: List[Dict],
                 enable_zoom=enable_zoom,
                 auto_terminate=False,  # Keep alive for downloads
                 watermark_path=watermark_path,
-                is_portrait=is_portrait
+                is_portrait=is_portrait,
+                saving_dir=saving_dir  # Pass saving_dir for immediate downloads
             )
             
             # Track instance ID for cleanup
@@ -1341,19 +1385,34 @@ def execute_parallel_batches(scenes: List[Dict],
                 batch_dir = os.path.join(base_dir, f"batch_{batch_id}_{int(time.time())}")
                 os.makedirs(batch_dir, exist_ok=True)
                 
-                # Download all results (this also terminates the instance)
-                download_result = operation.download_batch_results(
-                    batch_results=result['batch_results'],
-                    output_dir=batch_dir,
-                    instance_id=result.get('instance_id')
-                )
-                
-                # Update result with download info
-                result["downloaded_files"] = download_result.get("downloaded_files", [])
-                result["download_dir"] = batch_dir
-                result["final_cost_usd"] = download_result.get("final_cost_usd", result["cost_usd"])
-                
-                print(f"✅ Batch {batch_id}: Downloaded {len(result['downloaded_files'])} files to {batch_dir}")
+                # Check if files were already downloaded by execute_batch
+                if result.get("downloaded_files") and result.get("download_dir"):
+                    # Files already downloaded immediately, just terminate instance
+                    print(f"✅ Batch {batch_id}: {result['download_count']} files already downloaded to {result['download_dir']}")
+                    
+                    # Terminate instance and get final cost
+                    if result.get('instance_id'):
+                        try:
+                            operation.terminate_instance(result['instance_id'])
+                            final_runtime = time.time() - operation.instance_start_time
+                            final_cost_info = operation.calculate_cost(final_runtime)
+                            result["final_cost_usd"] = final_cost_info["total_cost_usd"]
+                            print(f"✅ Batch {batch_id}: Instance terminated (final cost: ${result['final_cost_usd']:.4f})")
+                        except Exception as e:
+                            print(f"⚠️ Batch {batch_id}: Failed to terminate instance: {str(e)}")
+                else:
+                    # Fallback: Download if not already done (shouldn't happen with new code)
+                    download_result = operation.download_batch_results(
+                        batch_results=result['batch_results'],
+                        output_dir=batch_dir,
+                        instance_id=result.get('instance_id')
+                    )
+                    
+                    # Update result with download info
+                    result["downloaded_files"] = download_result.get("downloaded_files", [])
+                    result["download_dir"] = batch_dir
+                    result["final_cost_usd"] = download_result.get("final_cost_usd", result["cost_usd"])
+                    print(f"✅ Batch {batch_id}: Downloaded {len(result['downloaded_files'])} files to {batch_dir}")
             else:
                 # CRITICAL: If batch failed or has no results, we must still terminate the instance
                 print(f"⚠️ Batch {batch_id}: Failed or no results - terminating instance immediately")
