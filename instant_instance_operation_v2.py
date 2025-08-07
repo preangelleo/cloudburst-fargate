@@ -272,6 +272,51 @@ class InstantInstanceOperationV2:
         print(f"🎬 Total scenes found: {len(scenes)}")
         return scenes
     
+    def check_aws_account_validity(self) -> Dict:
+        """Check if AWS account is valid and not blocked"""
+        try:
+            # Try a simple AWS operation to check account access
+            response = self.ec2_client.describe_regions()
+            
+            # If we can list regions, the account is valid
+            return {
+                "valid": True,
+                "message": "AWS account is active and accessible",
+                "regions_count": len(response.get('Regions', []))
+            }
+            
+        except self.ec2_client.exceptions.UnauthorizedOperation as e:
+            return {
+                "valid": False,
+                "message": "AWS account access denied - possible security block",
+                "error": str(e),
+                "error_type": "UnauthorizedOperation"
+            }
+        except self.ec2_client.exceptions.AuthFailure as e:
+            return {
+                "valid": False,
+                "message": "AWS authentication failed",
+                "error": str(e),
+                "error_type": "AuthFailure"
+            }
+        except Exception as e:
+            # Check for specific error messages that indicate account issues
+            error_str = str(e).lower()
+            if "blocked" in error_str or "suspended" in error_str or "unauthorized" in error_str:
+                return {
+                    "valid": False,
+                    "message": "AWS account appears to be blocked or suspended",
+                    "error": str(e),
+                    "error_type": "AccountBlocked"
+                }
+            else:
+                return {
+                    "valid": False,
+                    "message": f"Unable to verify AWS account status: {str(e)}",
+                    "error": str(e),
+                    "error_type": "Unknown"
+                }
+    
     def check_instance_availability(self, instance_type: str) -> Dict:
         """Check if instance type is available and get quota info"""
         try:
