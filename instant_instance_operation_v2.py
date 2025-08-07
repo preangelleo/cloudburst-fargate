@@ -1016,8 +1016,7 @@ echo "Startup completed at $(date)"
                 
                 response = requests.get(download_url, timeout=120)
                 if response.status_code == 200:
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    filename = f"{scene_name}_{timestamp}.mp4"
+                    filename = f"{scene_name}.mp4"
                     output_path = os.path.join(output_dir, filename)
                     
                     with open(output_path, 'wb') as f:
