@@ -591,7 +591,8 @@ echo "Startup completed at $(date)"
     
     def process_single_scene(self, public_ip: str, scene: Dict, language: str = "chinese", 
                            enable_zoom: bool = True, enable_subtitles: bool = True,
-                           watermark_path: str = None, is_portrait: bool = False) -> Optional[Dict]:
+                           watermark_path: str = None, is_portrait: bool = False,
+                           background_box: bool = True, background_opacity: float = 0.2) -> Optional[Dict]:
         """
         Process a single scene with the new unified API endpoint
         
@@ -603,14 +604,12 @@ echo "Startup completed at $(date)"
             enable_subtitles: Whether to add subtitles
             watermark_path: Path to watermark image file (optional)
             is_portrait: Whether video is in portrait mode
+            background_box: Whether to show subtitle background (default: True)
+            background_opacity: Subtitle background transparency 0-1 (default: 0.2)
+                              Note: 0.0 = solid black, 1.0 = fully transparent
         
         Returns:
             Dict with processing result or None if failed
-            public_ip: API server IP
-            scene: Scene dictionary with input_image, input_audio, subtitle
-            language: Language setting (chinese/english)
-            enable_zoom: Enable zoom in/out effects
-            enable_subtitles: Enable subtitle addition
             
         Returns:
             Dict with scene results or None if failed
@@ -644,8 +643,8 @@ echo "Startup completed at $(date)"
             "input_image": image_b64,
             "input_audio": audio_b64,
             "language": language,
-            "background_box": True,
-            "background_opacity": 0.7,
+            "background_box": background_box,
+            "background_opacity": background_opacity,
             "output_filename": f"{scene_name}_{datetime.now().strftime('%H%M%S')}.mp4",
             "is_portrait": is_portrait
         }
@@ -771,7 +770,8 @@ echo "Startup completed at $(date)"
     def execute_batch(self, scenes: List[Dict], language: str = "chinese", 
                           enable_zoom: bool = True, auto_terminate: bool = False,
                           watermark_path: str = None, is_portrait: bool = False,
-                          saving_dir: str = None) -> Dict:
+                          saving_dir: str = None, background_box: bool = True,
+                          background_opacity: float = 0.2) -> Dict:
         """
         Main function: Execute batch scene processing
         
@@ -790,6 +790,9 @@ echo "Startup completed at $(date)"
             is_portrait: Whether video is in portrait mode (default: False)
             saving_dir: Directory to save downloaded files (optional). Priority:
                        1. User-provided saving_dir
+            background_box: Whether to show subtitle background (default: True)
+            background_opacity: Subtitle background transparency 0-1 (default: 0.2)
+                              Note: 0.0 = solid black, 1.0 = fully transparent
                        2. RESULTS_DIR from environment/.env
                        3. Default: ./cloudburst_results/
             
@@ -851,7 +854,8 @@ echo "Startup completed at $(date)"
                 
                 result = self.process_single_scene(public_ip, scene, language, enable_zoom, 
                                                  enable_subtitles=True, watermark_path=watermark_path, 
-                                                 is_portrait=is_portrait)
+                                                 is_portrait=is_portrait, background_box=background_box,
+                                                 background_opacity=background_opacity)
                 
                 if result:
                     self.batch_results.append(result)
@@ -1067,7 +1071,8 @@ echo "Startup completed at $(date)"
 # Convenience functions for direct use
 def scan_and_test_folder(folder_path: str, language: str = "chinese", 
                         enable_zoom: bool = True, config_priority: int = 1,
-                        saving_dir: str = None) -> Dict:
+                        saving_dir: str = None, background_box: bool = True,
+                        background_opacity: float = 0.2) -> Dict:
     """
     Convenience function to scan folder and run batch processing
     
@@ -1080,6 +1085,9 @@ def scan_and_test_folder(folder_path: str, language: str = "chinese",
                    1. User-provided saving_dir
                    2. RESULTS_DIR from environment/.env
                    3. Default: ./cloudburst_results/
+        background_box: Whether to show subtitle background (default: True)
+        background_opacity: Subtitle background transparency 0-1 (default: 0.2)
+                          Note: 0.0 = solid black, 1.0 = fully transparent
         
     Returns:
         Batch processing results dictionary
@@ -1099,13 +1107,15 @@ def scan_and_test_folder(folder_path: str, language: str = "chinese",
     
     # Execute batch processing (keep instance alive for potential downloads)
     result = operation.execute_batch(scenes, language, enable_zoom, auto_terminate=False, 
-                                   watermark_path=None, is_portrait=False, saving_dir=saving_dir)
+                                   watermark_path=None, is_portrait=False, saving_dir=saving_dir,
+                                   background_box=background_box, background_opacity=background_opacity)
     result["config_used"] = operation.current_config
     return result
 
 def instant_batch_processing(scenes: List[Dict], language: str = "chinese", 
                       enable_zoom: bool = True, config_priority: int = 1,
-                      saving_dir: str = None) -> Dict:
+                      saving_dir: str = None, background_box: bool = True,
+                      background_opacity: float = 0.2) -> Dict:
     """
     Convenience function for instant batch video processing
     
@@ -1118,13 +1128,17 @@ def instant_batch_processing(scenes: List[Dict], language: str = "chinese",
                    1. User-provided saving_dir
                    2. RESULTS_DIR from environment/.env
                    3. Default: ./cloudburst_results/
+        background_box: Whether to show subtitle background (default: True)
+        background_opacity: Subtitle background transparency 0-1 (default: 0.2)
+                          Note: 0.0 = solid black, 1.0 = fully transparent
         
     Returns:
         Batch processing results
     """
     operation = InstantInstanceOperationV2(config_priority=config_priority)
     result = operation.execute_batch(scenes, language, enable_zoom, auto_terminate=False, 
-                                   watermark_path=None, is_portrait=False, saving_dir=saving_dir)
+                                   watermark_path=None, is_portrait=False, saving_dir=saving_dir,
+                                   background_box=background_box, background_opacity=background_opacity)
     result["config_used"] = operation.current_config
     return result
 
@@ -1233,7 +1247,9 @@ def execute_parallel_batches(scenes: List[Dict],
                            min_scenes_per_batch: int = 5,
                            watermark_path: str = None,
                            is_portrait: bool = False,
-                           saving_dir: str = None) -> Dict:
+                           saving_dir: str = None,
+                           background_box: bool = True,
+                           background_opacity: float = 0.2) -> Dict:
     """
     Execute large scene lists in parallel across multiple instances
     
@@ -1262,6 +1278,9 @@ def execute_parallel_batches(scenes: List[Dict],
         watermark_path: Optional path to watermark image
         is_portrait: Whether video is in portrait mode
         saving_dir: Directory to save downloaded files (default: ./cloudburst_results/)
+        background_box: Whether to show subtitle background (default: True)
+        background_opacity: Subtitle background transparency 0-1 (default: 0.2)
+                          Note: 0.0 = solid black, 1.0 = fully transparent
         
     Returns:
         Dict with aggregated results from all batches, ordered by scene name:
@@ -1345,7 +1364,9 @@ def execute_parallel_batches(scenes: List[Dict],
                 auto_terminate=False,  # Keep alive for downloads
                 watermark_path=watermark_path,
                 is_portrait=is_portrait,
-                saving_dir=saving_dir  # Pass saving_dir for immediate downloads
+                saving_dir=saving_dir,  # Pass saving_dir for immediate downloads
+                background_box=background_box,
+                background_opacity=background_opacity
             )
             
             # Track instance ID for cleanup
