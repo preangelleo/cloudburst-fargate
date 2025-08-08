@@ -1,6 +1,15 @@
 # CloudBurst Fargate - Serverless Video Processing
 
+[![PyPI version](https://badge.fury.io/py/cloudburst-fargate.svg)](https://pypi.org/project/cloudburst-fargate/)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![AWS ECS](https://img.shields.io/badge/AWS-ECS%20Fargate-orange.svg)](https://aws.amazon.com/fargate/)
+
 My second open source project, now powered by **AWS ECS Fargate**! 🚀
+
+**Author**: Leo Wang ([leowang.net](https://leowang.net))  
+**Email**: me@leowang.net  
+**License**: MIT
 
 > **📚 Related Projects**: 
 > - **Original CloudBurst (EC2)**: https://github.com/preangelleo/cloudburst
@@ -21,6 +30,25 @@ A production-ready Python framework that uses **AWS ECS Fargate** for serverless
 
 **Perfect for**: Production applications that need scalable serverless video processing without the complexity of managing EC2 instances.
 
+## 📦 Installation
+
+### Install from PyPI
+```bash
+pip install cloudburst-fargate
+```
+
+### Install from GitHub
+```bash
+pip install git+https://github.com/preangelleo/cloudburst-fargate.git
+```
+
+### Install from Source
+```bash
+git clone https://github.com/preangelleo/cloudburst-fargate.git
+cd cloudburst-fargate
+pip install -e .
+```
+
 ## 🆚 CloudBurst Evolution: EC2 → Fargate
 
 | Feature | CloudBurst EC2 (v1) | **CloudBurst Fargate (v2)** |
@@ -35,11 +63,9 @@ A production-ready Python framework that uses **AWS ECS Fargate** for serverless
 
 ## 🚀 Quick Start
 
-### 1. Install Dependencies
+### 1. Install Package
 ```bash
-git clone https://github.com/preangelleo/cloudburst
-cd cloudburst_fargate
-pip install -r requirements.txt
+pip install cloudburst-fargate
 ```
 
 ### 2. Setup AWS Permissions (CRITICAL)
@@ -135,7 +161,7 @@ cp .env.example .env
 
 ### 4. Test Your Setup
 ```python
-from fargate_operation_v1 import FargateOperationV1
+from cloudburst_fargate import FargateOperationV1
 
 # Quick single-scene test
 processor = FargateOperationV1(config_priority=1)
@@ -152,7 +178,7 @@ print(f"✅ Generated {result['successful_scenes']} videos")
 
 ### 5. Parallel Processing (Production Ready!)
 ```python
-from fargate_operation_v1 import execute_parallel_batches
+from cloudburst_fargate.fargate_operation import execute_parallel_batches
 
 # Process multiple scenes across parallel Fargate containers
 scenes = [
@@ -169,7 +195,12 @@ result = execute_parallel_batches(
     max_parallel_tasks=2,      # 2 concurrent containers
     language="english",
     enable_zoom=True,
-    saving_dir="./output"
+    config_priority=1,         # CPU configuration (1-5, default: 4)
+    watermark_path=None,       # Optional watermark image
+    is_portrait=False,         # Portrait mode (default: False)
+    saving_dir="./output",     # Output directory
+    background_box=True,       # Subtitle background (default: True)
+    background_opacity=0.2     # Background transparency 0-1 (default: 0.2)
 )
 
 print(f"🚀 Efficiency: {result['efficiency']['speedup_factor']:.2f}x speedup")
@@ -228,16 +259,22 @@ See [`example_usage.py`](./example_usage.py) for comprehensive examples includin
 
 ```python
 # Quick parallel processing example
-from fargate_operation_v1 import execute_parallel_batches
+from cloudburst_fargate import FargateOperationV1
+from cloudburst_fargate.fargate_operation import execute_parallel_batches
 
 result = execute_parallel_batches(
     scenes=your_scenes,
     scenes_per_batch=3,          # Scenes per container
-    max_parallel_tasks=4,        # Concurrent containers
+    max_parallel_tasks=4,        # Concurrent containers  
     language="chinese",          # or "english"
-    enable_zoom=True,           # Add zoom effects
-    config_priority=2,          # High performance config
-    saving_dir="./videos"       # Output directory
+    enable_zoom=True,            # Add zoom effects
+    config_priority=2,           # High performance config (1-5)
+    min_scenes_per_batch=5,      # Min scenes to justify startup (default: 5)
+    watermark_path=None,         # Optional watermark
+    is_portrait=False,           # Portrait video mode
+    saving_dir="./videos",       # Output directory
+    background_box=True,         # Show subtitle background
+    background_opacity=0.2       # Subtitle transparency
 )
 
 # Automatic results:
@@ -396,6 +433,84 @@ All tasks created by CloudBurst Fargate are automatically tagged for easy identi
 - `Language`: Processing language (english/chinese)
 
 This tagging system ensures that cleanup operations only affect tasks created by your application, preventing interference with other services using the same ECS cluster.
+
+## 📚 API Reference: execute_parallel_batches()
+
+### Complete Parameter List
+
+```python
+execute_parallel_batches(
+    scenes: List[Dict],              # Required: List of scene dictionaries
+    scenes_per_batch: int = 10,      # Scenes per Fargate container
+    max_parallel_tasks: int = 10,    # Maximum concurrent containers
+    language: str = "chinese",       # Language: "chinese" or "english"
+    enable_zoom: bool = True,        # Enable zoom in/out effects
+    config_priority: int = 4,        # CPU config (1-5, see table below)
+    min_scenes_per_batch: int = 5,   # Minimum scenes to justify container startup
+    watermark_path: str = None,      # Optional watermark image path
+    is_portrait: bool = False,       # Portrait video mode
+    saving_dir: str = None,          # Output directory (default: ./cloudburst_fargate_results/)
+    background_box: bool = True,     # Show subtitle background
+    background_opacity: float = 0.2  # Background transparency (0=opaque, 1=transparent)
+) -> Dict
+```
+
+### Scene Dictionary Format
+
+Each scene in the `scenes` list must contain:
+
+```python
+{
+    "scene_name": "unique_name",     # Required: Unique identifier for the scene
+    "image_path": "path/to/image",   # Required: Path to image file
+    "audio_path": "path/to/audio",   # Required: Path to audio file
+    "subtitle_path": "path/to/srt"   # Optional: Path to subtitle file
+}
+```
+
+### CPU Configuration Priority
+
+| Priority | vCPU | Memory | Name | Cost/Hour | Best For |
+|----------|------|--------|------|-----------|----------|
+| 1 | 2 | 4GB | STANDARD | $0.088 | Most tasks |
+| 2 | 4 | 8GB | HIGH_PERFORMANCE | $0.175 | Faster processing |
+| 3 | 8 | 16GB | ULTRA_PERFORMANCE | $0.351 | Very fast |
+| 4 | 16 | 32GB | MAXIMUM_PERFORMANCE | $0.702 | Fastest (default) |
+| 5 | 1 | 2GB | ECONOMY | $0.044 | Cost-sensitive |
+
+### Return Value Structure
+
+```python
+{
+    "success": bool,                    # Overall success status
+    "total_scenes": int,                # Total number of input scenes
+    "successful_scenes": int,           # Successfully processed scenes
+    "failed_scenes": int,               # Failed scenes count
+    "total_cost_usd": float,            # Total cost in USD
+    "total_duration": float,            # Total time in seconds
+    "downloaded_files": List[str],      # Paths to downloaded videos
+    "task_results": List[Dict],         # Individual task results
+    "tasks_used": int,                  # Number of Fargate tasks used
+    "efficiency": {
+        "speedup_factor": float,        # Speedup vs sequential processing
+        "processing_efficiency": float,  # Percentage of time spent processing
+        "cost_per_scene": float         # Average cost per scene
+    }
+}
+```
+
+### Smart Distribution Examples
+
+```python
+# Example 1: Even distribution
+# 50 scenes, batch=10, max_tasks=10 → 5 tasks × 10 scenes each
+
+# Example 2: Redistribution for efficiency  
+# 120 scenes, batch=10, max_tasks=10 → 10 tasks × 12 scenes each
+
+# Example 3: Handling remainders
+# 101 scenes, batch=10, max_tasks=10 → 9 tasks × 10 scenes + 1 task × 11 scenes
+```
 
 ## 🎯 Roadmap
 

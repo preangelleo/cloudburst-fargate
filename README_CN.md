@@ -1,6 +1,15 @@
 # CloudBurst Fargate - 无服务器视频处理框架
 
+[![PyPI version](https://badge.fury.io/py/cloudburst-fargate.svg)](https://pypi.org/project/cloudburst-fargate/)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![AWS ECS](https://img.shields.io/badge/AWS-ECS%20Fargate-orange.svg)](https://aws.amazon.com/fargate/)
+
 我的第二个开源项目，现已升级到 **AWS ECS Fargate** 架构！🚀
+
+**作者**: Leo Wang ([leowang.net](https://leowang.net))  
+**邮箱**: me@leowang.net  
+**许可证**: MIT
 
 > **📚 相关项目**: 
 > - **原版 CloudBurst (EC2)**: https://github.com/preangelleo/cloudburst
@@ -21,6 +30,25 @@
 
 **完美适用于**：需要可扩展的无服务器视频处理，但不想管理 EC2 实例复杂性的生产应用。
 
+## 📦 安装
+
+### 从 PyPI 安装
+```bash
+pip install cloudburst-fargate
+```
+
+### 从 GitHub 安装
+```bash
+pip install git+https://github.com/preangelleo/cloudburst-fargate.git
+```
+
+### 从源代码安装
+```bash
+git clone https://github.com/preangelleo/cloudburst-fargate.git
+cd cloudburst-fargate
+pip install -e .
+```
+
 ## 🆚 CloudBurst 演进：EC2 → Fargate
 
 | 功能特性 | CloudBurst EC2 (v1) | **CloudBurst Fargate (v2)** |
@@ -35,11 +63,9 @@
 
 ## 🚀 快速开始
 
-### 1. 安装依赖
+### 1. 安装包
 ```bash
-git clone https://github.com/preangelleo/cloudburst
-cd cloudburst_fargate
-pip install -r requirements.txt
+pip install cloudburst-fargate
 ```
 
 ### 2. 设置 AWS 权限 (关键步骤)
@@ -135,7 +161,7 @@ cp .env.example .env
 
 ### 4. 测试设置
 ```python
-from fargate_operation_v1 import FargateOperationV1
+from cloudburst_fargate import FargateOperationV1
 
 # 快速单场景测试
 processor = FargateOperationV1(config_priority=1)
@@ -152,7 +178,7 @@ print(f"✅ 生成了 {result['successful_scenes']} 个视频")
 
 ### 5. 并行处理（生产就绪！）
 ```python
-from fargate_operation_v1 import execute_parallel_batches
+from cloudburst_fargate.fargate_operation import execute_parallel_batches
 
 # 跨多个并行 Fargate 容器处理多个场景
 scenes = [
@@ -169,7 +195,12 @@ result = execute_parallel_batches(
     max_parallel_tasks=2,      # 2 个并发容器
     language="chinese",
     enable_zoom=True,
-    saving_dir="./output"
+    config_priority=1,         # CPU 配置 (1-5, 默认: 4)
+    watermark_path=None,       # 可选水印图像
+    is_portrait=False,         # 竖屏模式 (默认: False)
+    saving_dir="./output",     # 输出目录
+    background_box=True,       # 字幕背景 (默认: True)
+    background_opacity=0.2     # 背景透明度 0-1 (默认: 0.2)
 )
 
 print(f"🚀 效率提升: {result['efficiency']['speedup_factor']:.2f}x 加速")
@@ -228,16 +259,21 @@ processor = FargateOperationV1(config_priority=4)
 
 ```python
 # 快速并行处理示例
-from fargate_operation_v1 import execute_parallel_batches
+from cloudburst_fargate.fargate_operation import execute_parallel_batches
 
 result = execute_parallel_batches(
     scenes=your_scenes,
     scenes_per_batch=3,          # 每容器场景数
     max_parallel_tasks=4,        # 并发容器数
     language="chinese",          # 或 "english"
-    enable_zoom=True,           # 添加缩放效果
-    config_priority=2,          # 高性能配置
-    saving_dir="./videos"       # 输出目录
+    enable_zoom=True,            # 添加缩放效果
+    config_priority=2,           # 高性能配置 (1-5)
+    min_scenes_per_batch=5,      # 最少场景数 (默认: 5)
+    watermark_path=None,         # 可选水印
+    is_portrait=False,           # 竖屏视频模式
+    saving_dir="./videos",       # 输出目录
+    background_box=True,         # 显示字幕背景
+    background_opacity=0.2       # 字幕透明度
 )
 
 # 自动结果：
@@ -359,7 +395,7 @@ CloudBurst Fargate 现在包含高级任务监控和清理功能，确保生产�
 
 #### 列出运行中的任务
 ```python
-from fargate_operation_v1 import FargateOperationV1
+from cloudburst_fargate import FargateOperationV1
 
 # 初始化操作
 fargate_op = FargateOperationV1()
@@ -421,6 +457,84 @@ CloudBurst Fargate 创建的所有任务都会自动添加标签以便识别：
 | **CloudBurst Fargate** | 偶尔使用，批量处理 | 按秒付费（~$0.026/批） | 自动创建/销毁容器 |
 
 CloudBurst Fargate 自动拉取并部署视频生成 API Docker 镜像，让您以 95%+ 的成本节省获得同样强大的视频生成能力！
+
+## 📚 API 参考：execute_parallel_batches()
+
+### 完整参数列表
+
+```python
+execute_parallel_batches(
+    scenes: List[Dict],              # 必需：场景字典列表
+    scenes_per_batch: int = 10,      # 每个 Fargate 容器的场景数
+    max_parallel_tasks: int = 10,    # 最大并发容器数
+    language: str = "chinese",       # 语言："chinese" 或 "english"
+    enable_zoom: bool = True,        # 启用缩放进出效果
+    config_priority: int = 4,        # CPU 配置 (1-5，见下表)
+    min_scenes_per_batch: int = 5,   # 启动容器的最少场景数
+    watermark_path: str = None,      # 可选水印图像路径
+    is_portrait: bool = False,       # 竖屏视频模式
+    saving_dir: str = None,          # 输出目录 (默认: ./cloudburst_fargate_results/)
+    background_box: bool = True,     # 显示字幕背景
+    background_opacity: float = 0.2  # 背景透明度 (0=不透明，1=完全透明)
+) -> Dict
+```
+
+### 场景字典格式
+
+`scenes` 列表中的每个场景必须包含：
+
+```python
+{
+    "scene_name": "unique_name",     # 必需：场景的唯一标识符
+    "image_path": "path/to/image",   # 必需：图像文件路径
+    "audio_path": "path/to/audio",   # 必需：音频文件路径
+    "subtitle_path": "path/to/srt"   # 可选：字幕文件路径
+}
+```
+
+### CPU 配置优先级
+
+| 优先级 | vCPU | 内存 | 名称 | 每小时成本 | 最适合 |
+|--------|------|------|------|------------|--------|
+| 1 | 2 | 4GB | 标准 | $0.088 | 大多数任务 |
+| 2 | 4 | 8GB | 高性能 | $0.175 | 更快处理 |
+| 3 | 8 | 16GB | 超高性能 | $0.351 | 非常快 |
+| 4 | 16 | 32GB | 最高性能 | $0.702 | 最快 (默认) |
+| 5 | 1 | 2GB | 经济 | $0.044 | 成本敏感 |
+
+### 返回值结构
+
+```python
+{
+    "success": bool,                    # 总体成功状态
+    "total_scenes": int,                # 输入场景总数
+    "successful_scenes": int,           # 成功处理的场景数
+    "failed_scenes": int,               # 失败的场景数
+    "total_cost_usd": float,            # 总成本（美元）
+    "total_duration": float,            # 总时间（秒）
+    "downloaded_files": List[str],      # 下载的视频路径
+    "task_results": List[Dict],         # 各个任务的结果
+    "tasks_used": int,                  # 使用的 Fargate 任务数
+    "efficiency": {
+        "speedup_factor": float,        # 相比顺序处理的加速倍数
+        "processing_efficiency": float,  # 处理时间占比百分比
+        "cost_per_scene": float         # 每个场景的平均成本
+    }
+}
+```
+
+### 智能分配示例
+
+```python
+# 示例 1：均匀分配
+# 50 个场景，batch=10，max_tasks=10 → 5 个任务 × 每个 10 个场景
+
+# 示例 2：为效率重新分配
+# 120 个场景，batch=10，max_tasks=10 → 10 个任务 × 每个 12 个场景
+
+# 示例 3：处理余数
+# 101 个场景，batch=10，max_tasks=10 → 9 个任务 × 10 个场景 + 1 个任务 × 11 个场景
+```
 
 ## 📄 许可证
 
