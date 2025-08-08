@@ -366,7 +366,9 @@ class FargateOperationV1:
                 tags=[
                     {'key': 'Project', 'value': 'CloudBurst'},
                     {'key': 'Scene', 'value': scene['scene_name']},
-                    {'key': 'Language', 'value': kwargs.get('language', 'english')}
+                    {'key': 'Language', 'value': kwargs.get('language', 'english')},
+                    {'key': 'CreatedBy', 'value': 'animagent'},
+                    {'key': 'Purpose', 'value': 'video-generation'}
                 ]
             )
             
@@ -775,8 +777,12 @@ class FargateOperationV1:
             'public_ip': public_ip  # For debugging
         }
     
-    def list_running_tasks(self) -> List[Dict]:
-        """List all running Fargate tasks in the cluster"""
+    def list_running_tasks(self, filter_animagent_only: bool = True) -> List[Dict]:
+        """List running Fargate tasks in the cluster
+        
+        Args:
+            filter_animagent_only: If True, only return tasks created by animagent
+        """
         try:
             # List all running tasks
             response = self.ecs_client.list_tasks(
@@ -797,15 +803,42 @@ class FargateOperationV1:
             
             running_tasks = []
             for task in tasks_response.get('tasks', []):
+                task_arn = task['taskArn']
+                
+                # If filtering is enabled, check task tags
+                if filter_animagent_only:
+                    try:
+                        # Get task tags
+                        tags_response = self.ecs_client.list_tags_for_resource(
+                            resourceArn=task_arn
+                        )
+                        tags = tags_response.get('tags', [])
+                        
+                        # Check if this task was created by animagent
+                        is_animagent_task = False
+                        for tag in tags:
+                            if tag.get('key') == 'CreatedBy' and tag.get('value') == 'animagent':
+                                is_animagent_task = True
+                                break
+                        
+                        # Skip non-animagent tasks
+                        if not is_animagent_task:
+                            continue
+                    except Exception as e:
+                        # If we can't get tags, skip this task when filtering
+                        print(f"⚠️ Could not get tags for task {task_arn}: {str(e)}")
+                        continue
+                
                 # Extract relevant information
                 task_info = {
-                    'task_arn': task['taskArn'],
+                    'task_arn': task_arn,
                     'task_definition': task.get('taskDefinitionArn', '').split('/')[-1],
                     'status': task['lastStatus'],
                     'started_at': task.get('startedAt', ''),
                     'cpu': task.get('cpu', ''),
                     'memory': task.get('memory', ''),
-                    'public_ip': None
+                    'public_ip': None,
+                    'tags': tags if filter_animagent_only else []
                 }
                 
                 # Try to get public IP
@@ -836,11 +869,16 @@ class FargateOperationV1:
             print(f"❌ Error listing running tasks: {str(e)}")
             return []
     
-    def cleanup_all_tasks(self, reason: str = "Cleanup requested") -> Dict:
-        """Terminate all running Fargate tasks in the cluster"""
+    def cleanup_all_tasks(self, reason: str = "Cleanup requested", filter_animagent_only: bool = True) -> Dict:
+        """Terminate running Fargate tasks in the cluster
+        
+        Args:
+            reason: Reason for termination
+            filter_animagent_only: If True, only terminate tasks created by animagent
+        """
         try:
-            # Get all running tasks
-            running_tasks = self.list_running_tasks()
+            # Get running tasks (filtered by default)
+            running_tasks = self.list_running_tasks(filter_animagent_only=filter_animagent_only)
             
             if not running_tasks:
                 return {
