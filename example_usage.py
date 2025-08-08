@@ -583,6 +583,67 @@ def example_parallel_configurations():
     print("   • Consider your budget vs time requirements")
     print()
 
+def example_task_monitoring():
+    """Example 9: Task Monitoring and Management"""
+    print("\n" + "="*50)
+    print("Example 9: Task Monitoring and Management")
+    print("="*50)
+    
+    # Initialize Fargate operation
+    fargate_op = FargateOperationV1()
+    
+    # 1. List all running tasks
+    print("\n📋 Listing all running Fargate tasks...")
+    running_tasks = fargate_op.list_running_tasks(filter_animagent_only=True)
+    
+    if running_tasks:
+        print(f"Found {len(running_tasks)} running task(s):\n")
+        for task in running_tasks:
+            print(f"📌 Task ARN: {task['task_arn']}")
+            print(f"   Status: {task['status']}")
+            print(f"   Started: {task['started_at']}")
+            print(f"   CPU: {task['cpu']}, Memory: {task['memory']}")
+            if task['public_ip']:
+                print(f"   Public IP: {task['public_ip']}")
+            if task.get('tags'):
+                tag_list = [f"{t['key']}={t['value']}" for t in task['tags']]
+                print(f"   Tags: {tag_list}")
+            print()
+    else:
+        print("✅ No running Fargate tasks found")
+    
+    # 2. Example of cleanup (commented out for safety)
+    print("\n🧹 Cleanup example (uncomment to execute):")
+    print("""
+    # Cleanup all animagent-created tasks
+    cleanup_result = fargate_op.cleanup_all_tasks(
+        reason="Scheduled maintenance cleanup",
+        filter_animagent_only=True  # Only cleanup our tasks
+    )
+    
+    print(f"Cleanup completed:")
+    print(f"  - Success: {cleanup_result['success']}")
+    print(f"  - Message: {cleanup_result['message']}")
+    print(f"  - Terminated: {cleanup_result['terminated_count']} task(s)")
+    print(f"  - Failed: {cleanup_result['failed_count']} task(s)")
+    """)
+    
+    # 3. List all tasks (including non-animagent tasks)
+    print("\n📊 Comparison: All tasks vs animagent-only tasks")
+    all_tasks = fargate_op.list_running_tasks(filter_animagent_only=False)
+    animagent_tasks = fargate_op.list_running_tasks(filter_animagent_only=True)
+    
+    print(f"Total tasks in cluster: {len(all_tasks)}")
+    print(f"Animagent tasks: {len(animagent_tasks)}")
+    print(f"Other service tasks: {len(all_tasks) - len(animagent_tasks)}")
+    
+    print("\n💡 Key Features:")
+    print("   • Task filtering by CreatedBy=animagent tag")
+    print("   • Safe cleanup that doesn't affect other services")
+    print("   • Real-time task status and IP information")
+    print("   • Double security mechanism for production use")
+
+
 def example_cost_optimization():
     """Example showing cost optimization strategies for parallel processing"""
     print("💰 Cost Optimization for Parallel Processing")
@@ -670,51 +731,59 @@ def main():
     print("3. Test with 8 vCPU configuration")
     print("4. Show parameter combination examples") 
     print("5. Compare costs across configurations")
-    print("6. 🚀 Parallel processing examples (NEW!)")
-    print("7. ⚙️ Parallel configuration options (NEW!)")
-    print("8. 💰 Cost optimization strategies (NEW!)")
-    print("9. All of the above")
+    print("6. 🚀 Parallel processing examples")
+    print("7. ⚙️ Parallel configuration options")
+    print("8. 🔍 Task monitoring and management (NEW!)")
+    print("9. 💰 Cost optimization strategies")
+    print("10. All of the above")
     print()
     
-    choice = input("Enter choice (1-9): ").strip()
+    choice = input("Enter choice (1-10): ").strip()
     
-    if choice == "1" or choice == "9":
+    if choice == "1" or choice == "10":
         show_all_cpu_configurations()
         print()
     
-    if choice == "2" or choice == "9":
+    if choice == "2" or choice == "10":
         print_complete_api_documentation()
         print()
     
-    if choice == "3" or choice == "9":
+    if choice == "3" or choice == "10":
         example_test_with_8_vcpu()
         print()
     
-    if choice == "4" or choice == "9":
+    if choice == "4" or choice == "10":
         example_all_parameter_combinations()
         print()
     
-    if choice == "5" or choice == "9":
+    if choice == "5" or choice == "10":
         example_cost_comparison()
         print()
     
-    if choice == "6" or choice == "9":
+    if choice == "6" or choice == "10":
         example_parallel_processing()
         print()
     
-    if choice == "7" or choice == "9":
+    if choice == "7" or choice == "10":
         example_parallel_configurations()
         print()
     
-    if choice == "8" or choice == "9":
+    if choice == "8" or choice == "10":
+        example_task_monitoring()
+        print()
+        
+    if choice == "9" or choice == "10":
         example_cost_optimization()
         print()
     
     print("\n✅ Example usage completed!")
-    print("💡 New Parallel Processing Features:")
+    print("💡 New Features in v2:")
     print("   • execute_parallel_batches() - Process scenes across multiple Fargate containers")
+    print("   • list_running_tasks() - Monitor active Fargate tasks with filtering")
+    print("   • cleanup_all_tasks() - Safe cleanup of animagent-created tasks only")
     print("   • Automatic scene distribution and load balancing")  
     print("   • Real-time cost tracking and efficiency metrics")
+    print("   • Task tagging for safe multi-service environments")
     print("   • 1.8x speedup with minimal cost increase")
 
 if __name__ == "__main__":

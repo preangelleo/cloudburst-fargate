@@ -58,7 +58,9 @@ CloudBurst Fargate requires specific IAM permissions to manage ECS tasks, access
         "ecs:StopTask", 
         "ecs:DescribeTasks",
         "ecs:DescribeClusters",
-        "ecs:ListTasks"
+        "ecs:ListTasks",
+        "ecs:ListTagsForResource",
+        "ecs:TagResource"
       ],
       "Resource": "*"
     },
@@ -351,6 +353,49 @@ logging.basicConfig(level=logging.DEBUG)
 
 # Or check CloudWatch logs: /ecs/cloudburst
 ```
+
+### Task Monitoring and Management (New in v2)
+CloudBurst Fargate now includes advanced task monitoring and cleanup capabilities to ensure reliable production operations:
+
+#### List Running Tasks
+```python
+from fargate_operation_v1 import FargateOperationV1
+
+# Initialize the operation
+fargate_op = FargateOperationV1()
+
+# List all running Fargate tasks created by animagent
+running_tasks = fargate_op.list_running_tasks(filter_animagent_only=True)
+
+for task in running_tasks:
+    print(f"Task: {task['task_arn']}")
+    print(f"Status: {task['status']}")
+    print(f"Started: {task['started_at']}")
+    print(f"Public IP: {task['public_ip']}")
+    print(f"Tags: {task['tags']}")
+```
+
+#### Cleanup Stale Tasks
+```python
+# Cleanup all animagent-created tasks (double security mechanism)
+cleanup_result = fargate_op.cleanup_all_tasks(
+    reason="Scheduled cleanup",
+    filter_animagent_only=True  # Only cleanup tasks tagged with CreatedBy=animagent
+)
+
+print(f"Cleanup result: {cleanup_result['message']}")
+print(f"Tasks terminated: {cleanup_result['terminated_count']}")
+print(f"Failed cleanups: {cleanup_result['failed_count']}")
+```
+
+#### Task Identification
+All tasks created by CloudBurst Fargate are automatically tagged for easy identification:
+- `CreatedBy`: `animagent` - Identifies tasks created by this framework
+- `Purpose`: `video-generation` - Marks the task purpose
+- `Scene`: Scene name being processed
+- `Language`: Processing language (english/chinese)
+
+This tagging system ensures that cleanup operations only affect tasks created by your application, preventing interference with other services using the same ECS cluster.
 
 ## 🎯 Roadmap
 

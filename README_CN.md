@@ -58,7 +58,9 @@ CloudBurst Fargate 需要特定的 IAM 权限来管理 ECS 任务、访问 VPC �
         "ecs:StopTask", 
         "ecs:DescribeTasks",
         "ecs:DescribeClusters",
-        "ecs:ListTasks"
+        "ecs:ListTasks",
+        "ecs:ListTagsForResource",
+        "ecs:TagResource"
       ],
       "Resource": "*"
     },
@@ -351,6 +353,49 @@ logging.basicConfig(level=logging.DEBUG)
 
 # 或检查 CloudWatch 日志：/ecs/cloudburst
 ```
+
+### 任务监控与管理（v2 新功能）
+CloudBurst Fargate 现在包含高级任务监控和清理功能，确保生产环境的可靠运行：
+
+#### 列出运行中的任务
+```python
+from fargate_operation_v1 import FargateOperationV1
+
+# 初始化操作
+fargate_op = FargateOperationV1()
+
+# 列出所有由 animagent 创建的运行中的 Fargate 任务
+running_tasks = fargate_op.list_running_tasks(filter_animagent_only=True)
+
+for task in running_tasks:
+    print(f"任务: {task['task_arn']}")
+    print(f"状态: {task['status']}")
+    print(f"启动时间: {task['started_at']}")
+    print(f"公网 IP: {task['public_ip']}")
+    print(f"标签: {task['tags']}")
+```
+
+#### 清理过期任务
+```python
+# 清理所有 animagent 创建的任务（双重安全机制）
+cleanup_result = fargate_op.cleanup_all_tasks(
+    reason="定期清理",
+    filter_animagent_only=True  # 只清理标记为 CreatedBy=animagent 的任务
+)
+
+print(f"清理结果: {cleanup_result['message']}")
+print(f"已终止任务数: {cleanup_result['terminated_count']}")
+print(f"清理失败数: {cleanup_result['failed_count']}")
+```
+
+#### 任务标识
+CloudBurst Fargate 创建的所有任务都会自动添加标签以便识别：
+- `CreatedBy`: `animagent` - 标识此框架创建的任务
+- `Purpose`: `video-generation` - 标记任务用途
+- `Scene`: 正在处理的场景名称
+- `Language`: 处理语言（english/chinese）
+
+这个标签系统确保清理操作只影响您的应用程序创建的任务，防止干扰同一 ECS 集群中其他服务的任务。
 
 ## 🎯 发展路线
 
