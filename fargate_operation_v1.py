@@ -774,6 +774,114 @@ class FargateOperationV1:
             'task_arn': task_arn,  # Add task_arn for cleanup
             'public_ip': public_ip  # For debugging
         }
+    
+    def list_running_tasks(self) -> List[Dict]:
+        """List all running Fargate tasks in the cluster"""
+        try:
+            # List all running tasks
+            response = self.ecs_client.list_tasks(
+                cluster=self.cluster_name,
+                desiredStatus='RUNNING'
+            )
+            
+            running_task_arns = response.get('taskArns', [])
+            
+            if not running_task_arns:
+                return []
+            
+            # Get detailed information about each task
+            tasks_response = self.ecs_client.describe_tasks(
+                cluster=self.cluster_name,
+                tasks=running_task_arns
+            )
+            
+            running_tasks = []
+            for task in tasks_response.get('tasks', []):
+                # Extract relevant information
+                task_info = {
+                    'task_arn': task['taskArn'],
+                    'task_definition': task.get('taskDefinitionArn', '').split('/')[-1],
+                    'status': task['lastStatus'],
+                    'started_at': task.get('startedAt', ''),
+                    'cpu': task.get('cpu', ''),
+                    'memory': task.get('memory', ''),
+                    'public_ip': None
+                }
+                
+                # Try to get public IP
+                attachments = task.get('attachments', [])
+                for attachment in attachments:
+                    if attachment.get('type') == 'ElasticNetworkInterface':
+                        for detail in attachment.get('details', []):
+                            if detail.get('name') == 'networkInterfaceId':
+                                try:
+                                    # Get ENI details
+                                    eni_id = detail['value']
+                                    ec2 = self.session.client('ec2')
+                                    eni_response = ec2.describe_network_interfaces(
+                                        NetworkInterfaceIds=[eni_id]
+                                    )
+                                    if eni_response['NetworkInterfaces']:
+                                        public_ip = eni_response['NetworkInterfaces'][0].get('Association', {}).get('PublicIp')
+                                        if public_ip:
+                                            task_info['public_ip'] = public_ip
+                                except:
+                                    pass
+                
+                running_tasks.append(task_info)
+            
+            return running_tasks
+            
+        except Exception as e:
+            print(f"❌ Error listing running tasks: {str(e)}")
+            return []
+    
+    def cleanup_all_tasks(self, reason: str = "Cleanup requested") -> Dict:
+        """Terminate all running Fargate tasks in the cluster"""
+        try:
+            # Get all running tasks
+            running_tasks = self.list_running_tasks()
+            
+            if not running_tasks:
+                return {
+                    'success': True,
+                    'message': 'No running tasks found',
+                    'terminated_count': 0
+                }
+            
+            terminated = []
+            failed = []
+            
+            # Terminate each task
+            for task in running_tasks:
+                task_arn = task['task_arn']
+                try:
+                    self.ecs_client.stop_task(
+                        cluster=self.cluster_name,
+                        task=task_arn,
+                        reason=reason
+                    )
+                    terminated.append(task_arn)
+                    print(f"✅ Terminated task: {task_arn}")
+                except Exception as e:
+                    failed.append({'task_arn': task_arn, 'error': str(e)})
+                    print(f"❌ Failed to terminate task {task_arn}: {str(e)}")
+            
+            return {
+                'success': len(failed) == 0,
+                'terminated_count': len(terminated),
+                'failed_count': len(failed),
+                'terminated_tasks': terminated,
+                'failed_tasks': failed,
+                'message': f'Terminated {len(terminated)} tasks, {len(failed)} failed'
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f'Error during cleanup: {str(e)}',
+                'terminated_count': 0
+            }
 
 # Convenience functions for backward compatibility
 def scan_and_test_folder(folder_path: str, language: str = 'english', 
