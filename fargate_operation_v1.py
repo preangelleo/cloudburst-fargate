@@ -314,12 +314,12 @@ class FargateOperationV1:
             if os.path.exists(audio_file):
                 scene = {
                     "scene_name": scene_name,
-                    "input_image": image_file,
-                    "input_audio": audio_file,
-                    "subtitle": subtitle_file if os.path.exists(subtitle_file) else None
+                    "image_path": image_file,  # Fixed field name to match _prepare_scene_payload
+                    "audio_path": audio_file,  # Fixed field name to match _prepare_scene_payload
+                    "subtitle_path": subtitle_file if os.path.exists(subtitle_file) else None  # Fixed field name
                 }
                 scenes.append(scene)
-                print(f"📽️ Found scene: {scene_name} (subtitle: {'✅' if scene['subtitle'] else '❌'})")
+                print(f"📽️ Found scene: {scene_name} (subtitle: {'✅' if scene['subtitle_path'] else '❌'})")
         
         print(f"🎬 Total scenes found: {len(scenes)}")
         return scenes
@@ -336,7 +336,7 @@ class FargateOperationV1:
             ]
             
             # Add subtitle if present
-            if scene.get('subtitle'):
+            if scene.get('subtitle_path'):
                 environment.append({'name': 'HAS_SUBTITLE', 'value': 'true'})
             
             # Start the task
