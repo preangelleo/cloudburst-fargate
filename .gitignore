@@ -12,6 +12,13 @@
 # Internal Documentation (Excluded from Open Source)
 # =============================================================================
 docs/
+# PyPI related files and documentation
+PYPI_UPLOAD_INSTRUCTIONS.md
+PYPI_RELEASE_NOTES.md
+upload_to_pypi.py
+setup.py
+pyproject.toml
+MANIFEST.in
 # Note: example_usage.py is now included for users to learn the API
 
 # =============================================================================
@@ -135,3 +142,6 @@ Icon?
 .pytest_cache/
 .mypy_cache/
 .tox/
+
+PYPI_UPLOAD_INSTRUCTIONS.md
+PYPI_RELEASE_NOTES.md
